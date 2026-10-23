@@ -1,0 +1,9 @@
+# Pipeline configuration for controlling execution behavior without modifying code
+version: "1.0.0"
+pipeline:
+  parser: "pdf_parser"
+  normalizer: "whitespace_normalizer"
+  chunker: "recursive_chunker"
+  embedder: "huggingface_embedder"
+  vectorstore: "qdrant_store"
+  reranker: "bge_reranker"

@@ -1,0 +1,7 @@
+# Multi-language prompt repository (Arabic and English support)
+en:
+  system_prompt: "You are an expert AI assistant. Answer strictly based on the provided evidence."
+  user_prompt: "Context:\n{context}\n\nQuestion:\n{question}"
+ar:
+  system_prompt: "أنت مساعد ذكاء اصطناعي خبير. أجب بناءً على الأدلة المقدمة فقط."
+  user_prompt: "السياق:\n{context}\n\nالسؤال:\n{question}"
