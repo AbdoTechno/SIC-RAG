@@ -1,0 +1,95 @@
+import os
+import json
+import pytest
+from unittest.mock import MagicMock, patch
+from core.schemas import SourceMetadata, StoredRawFile
+from core.registry import registry
+import components.storage
+import components.parsers
+
+
+def test_both_postgres_and_sqlite_stores_registered():
+    pg_cls = registry.get_document_store("postgres_store")
+    sq_cls = registry.get_document_store("sqlite_store")
+    assert pg_cls.__name__ == "PostgresDocumentStore"
+    assert sq_cls.__name__ == "SQLiteDocumentStore"
+
+
+@patch("components.storage.postgres_document_store.psycopg.connect")
+def test_postgres_store_executes_bytea_and_jsonb_upsert(mock_connect):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+
+    store_cls = registry.get_document_store("postgres_store")
+    store = store_cls(dsn="postgresql://user:pass@localhost:5432/rag_db")
+
+    meta = SourceMetadata(
+        source_name="WHO Chest X-Ray Guideline",
+        version_date="2025",
+        source_link="https://who.int/cxr",
+        file_format="pdf",
+    )
+    raw_file = StoredRawFile(
+        filename="who_cxr.pdf",
+        file_format=".pdf",
+        raw_bytes=b"%PDF-1.4 clinical content",
+        metadata=meta,
+    )
+
+    mock_cursor.fetchone.return_value = {"file_id": raw_file.file_id}
+    returned_id = store.save_raw_file(raw_file)
+
+    assert returned_id == raw_file.file_id
+    executed_sql = mock_cursor.execute.call_args[0][0]
+    assert "ON CONFLICT (content_hash)" in executed_sql
+    assert "RETURNING file_id" in executed_sql
+
+
+def test_end_to_end_raw_blob_to_parsed_docs_contract():
+    dsn = os.getenv("TEST_POSTGRES_DSN")
+    if dsn:
+        store = registry.get_document_store("postgres_store")(dsn=dsn)
+    else:
+        store = registry.get_document_store("sqlite_store")(dsn=":memory:")
+
+    payload = [
+        {
+            "text": "Atelectasis and pleural effusion correlation with clinical history.",
+            "section": "Section 3.2",
+            "source_name": "ACR Thoracic Guideline",
+            "version_date": "2025-02",
+        }
+    ]
+    raw_bytes = json.dumps(payload).encode("utf-8")
+    meta = SourceMetadata(
+        source_name="ACR Thoracic Guideline",
+        version_date="2025-02",
+        source_link="https://acr.org",
+        file_format="json",
+    )
+
+    raw_file = StoredRawFile(filename="acr.json", file_format=".json", raw_bytes=raw_bytes, metadata=meta)
+    file_id = store.save_raw_file(raw_file)
+
+    # Deduplication check via SHA-256
+    duplicate_file = StoredRawFile(filename="acr_dup.json", file_format=".json", raw_bytes=raw_bytes, metadata=meta)
+    assert store.save_raw_file(duplicate_file) == file_id
+
+    # Retrieve raw bytes from DB and parse in-memory
+    fetched_blob = store.get_raw_file(file_id)
+    parser = registry.get_parser(fetched_blob.file_format)()
+    parsed_docs = parser.parse(
+        raw_bytes=fetched_blob.raw_bytes,
+        base_metadata={"source_name": fetched_blob.metadata.source_name},
+        file_id=file_id,
+    )
+
+    store.save_parsed_documents(parsed_docs)
+    saved_docs = store.get_parsed_documents_by_file(file_id)
+
+    assert len(saved_docs) == 1
+    assert saved_docs[0].file_id == file_id
+    assert "Atelectasis" in saved_docs[0].content
+    assert saved_docs[0].metadata.page_or_section == "Section 3.2"
