@@ -1,3 +1,6 @@
 
 # Logs and Reports
 logs/
+
+**/__pycache__/
+*.py[cod]
