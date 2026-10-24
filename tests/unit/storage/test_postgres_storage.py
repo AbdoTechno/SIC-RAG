@@ -73,11 +73,9 @@ def test_end_to_end_raw_blob_to_parsed_docs_contract():
     raw_file = StoredRawFile(filename="acr.json", file_format=".json", raw_bytes=raw_bytes, metadata=meta)
     file_id = store.save_raw_file(raw_file)
 
-    # Deduplication check via SHA-256
     duplicate_file = StoredRawFile(filename="acr_dup.json", file_format=".json", raw_bytes=raw_bytes, metadata=meta)
     assert store.save_raw_file(duplicate_file) == file_id
 
-    # Retrieve raw bytes from DB and parse in-memory
     fetched_blob = store.get_raw_file(file_id)
     parser = registry.get_parser(fetched_blob.file_format)()
     parsed_docs = parser.parse(
@@ -87,7 +85,7 @@ def test_end_to_end_raw_blob_to_parsed_docs_contract():
     )
 
     store.save_parsed_documents(parsed_docs)
-    saved_docs = store.get_parsed_documents_by_file(file_id)
+    saved_docs = store.get_parsed_docs_by_file(file_id) if hasattr(store, "get_parsed_docs_by_file") else store.get_parsed_documents_by_file(file_id)
 
     assert len(saved_docs) == 1
     assert saved_docs[0].file_id == file_id
