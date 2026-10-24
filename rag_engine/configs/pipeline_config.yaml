@@ -1,1 +1,9 @@
-# Pipeline configuration for controlling execution behavior without modifying code
+pipeline_name: "clinical_guidelines_rag"
+
+document_store:
+  provider: "postgres_store"
+  params:
+    dsn: "postgresql://postgres:postgres@localhost:5432/clinical_rag_db"
+
+ingestion:
+  supported_formats: [".pdf", ".md", ".json", ".txt"]
