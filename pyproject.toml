@@ -5,6 +5,7 @@ description = "rag engine reusable pipeline"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "psycopg[binary,pool]>=3.3.6",
     "pyyaml>=6.0.3",
 ]
 
@@ -16,6 +17,6 @@ dev = [
 
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = ["rag_engine"]
 testpaths = ["tests"]
 addopts = "-v"
