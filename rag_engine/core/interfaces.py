@@ -1,12 +1,27 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
-from core.schemas import RawDocument, DocumentChunk
+from typing import List, Dict, Any, Optional
+from core.schemas import StoredRawFile, RawDocument, DocumentChunk
 
-
-#Dependency Inversion
 class BaseFileParser(ABC):
     @abstractmethod
-    def parse(self, file_path: str, base_metadata: Dict[str, Any]) -> List[RawDocument]:
+    def parse(self, raw_bytes: bytes, base_metadata: Dict[str, Any], file_id: Optional[str] = None) -> List[RawDocument]:
+        pass
+
+class BaseDocumentStore(ABC):
+    @abstractmethod
+    def save_raw_file(self, raw_file: StoredRawFile) -> str:
+        pass
+
+    @abstractmethod
+    def get_raw_file(self, file_id: str) -> Optional[StoredRawFile]:
+        pass
+
+    @abstractmethod
+    def save_parsed_documents(self, documents: List[RawDocument]) -> None:
+        pass
+
+    @abstractmethod
+    def get_parsed_documents_by_file(self, file_id: str) -> List[RawDocument]:
         pass
 
 class BaseTextNormalizer(ABC):
