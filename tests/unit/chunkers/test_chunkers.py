@@ -6,7 +6,7 @@ import components.chunkers
 
 def test_chunkers_registered_in_registry():
     assert registry.get_chunker("recursive_chunker") is not None
-    assert registry.get_chunker("section_aware_chunker") is not None
+    assert registry.get_chunker("markdown_section_chunker") is not None
 
 
 def test_recursive_chunker_validates_parameters():
@@ -49,7 +49,7 @@ def test_recursive_chunker_splits_long_text_and_preserves_metadata():
 
 
 def test_section_aware_chunker_binds_clinical_headers_to_citation_metadata():
-    chunker = registry.get_chunker("section_aware_chunker")(chunk_size=200, chunk_overlap=20)
+    chunker = registry.get_chunker("markdown_section_chunker")(chunk_size=200, chunk_overlap=20)
     meta = SourceMetadata(
         source_name="BTS Thoracic Protocol",
         version_date="2024",

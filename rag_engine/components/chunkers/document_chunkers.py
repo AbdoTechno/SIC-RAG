@@ -7,6 +7,7 @@ from core.schemas import RawDocument, DocumentChunk
 from core.registry import registry
 
 
+# deterministic IDs - ensure idempotency
 def _generate_deterministic_chunk_id(doc_id: str, index: int, text: str) -> str:
     short_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
     return f"{doc_id}_chk_{index}_{short_hash}"
@@ -14,11 +15,6 @@ def _generate_deterministic_chunk_id(doc_id: str, index: int, text: str) -> str:
 
 @registry.register_chunker("recursive_chunker")
 class RecursiveHierarchyChunker(BaseChunker):
-    """
-    Splits clinical documents recursively using prioritized semantic separators
-    (paragraphs -> lines -> sentences -> words) while maintaining sliding window overlap.
-    """
-
     def __init__(
         self,
         chunk_size: int = 512,
@@ -41,7 +37,6 @@ class RecursiveHierarchyChunker(BaseChunker):
         if len(text) <= self.chunk_size:
             return [text]
 
-        # Split into atomic segments based on paragraphs/sentences first
         pattern = r"(\n\n|\n|(?<=[.؟!])\s+)"
         raw_parts = re.split(pattern, text)
         segments = [p for p in raw_parts if p and not p.isspace()]
@@ -61,7 +56,6 @@ class RecursiveHierarchyChunker(BaseChunker):
                 else:
                     current_chunk = seg.strip()
 
-                # Hard split if a single segment still exceeds chunk_size
                 step = max(1, self.chunk_size - self.chunk_overlap)
                 while len(current_chunk) > self.chunk_size:
                     chunks.append(current_chunk[: self.chunk_size].strip())
@@ -73,11 +67,12 @@ class RecursiveHierarchyChunker(BaseChunker):
         return chunks
 
     def chunk(self, document: RawDocument) -> List[DocumentChunk]:
-        text_Pieces = self._split_text(document.content)
+        text_pieces = self._split_text(document.content)
         result: List[DocumentChunk] = []
 
         base_section = document.metadata.page_or_section or "Document"
-        for idx, piece in enumerate(text_Pieces):
+        for idx, piece in enumerate(text_pieces):
+            # Immutability - we create a new metadata object rather than mutating the original
             chunk_meta = replace(
                 document.metadata,
                 page_or_section=f"{base_section} | Part {idx + 1}",
@@ -94,13 +89,9 @@ class RecursiveHierarchyChunker(BaseChunker):
         return result
 
 
-@registry.register_chunker("section_aware_chunker")
-class SectionAwareClinicalChunker(BaseChunker):
-    """
-    Detects Markdown and numbered clinical headings (e.g., '# Pneumonia', '2.1 Pleural Effusion')
-    and binds each section header directly into the chunk's SourceMetadata for accurate citation.
-    """
-
+# Decorator/Wrapper Pattern - enhances the recursive chunker with metadata extraction capabilities
+@registry.register_chunker("markdown_section_chunker")
+class MarkdownSectionChunker(BaseChunker):
     HEADER_REGEX = re.compile(r"^(#{1,4}\s+.+|\d+(?:\.\d+)*\s+[A-Z\u0600-\u06FF].+)$", re.MULTILINE)
 
     def __init__(self, chunk_size: int = 512, chunk_overlap: int = 64):
@@ -121,7 +112,6 @@ class SectionAwareClinicalChunker(BaseChunker):
         all_chunks: List[DocumentChunk] = []
         chunk_counter = 0
 
-        # Handle introductory text before the first header if present
         if matches[0].start() > 0:
             intro_text = content[: matches[0].start()].strip()
             if intro_text:
@@ -136,7 +126,6 @@ class SectionAwareClinicalChunker(BaseChunker):
                     all_chunks.append(c)
                     chunk_counter += 1
 
-        # Process each clinical section with its exact title
         for i, match in enumerate(matches):
             section_title = match.group(1).lstrip("#").strip()
             start_idx = match.start()

@@ -1,9 +1,6 @@
-from components.chunkers.clinical_chunkers import (
+from components.chunkers.document_chunkers import (
     RecursiveHierarchyChunker,
-    SectionAwareClinicalChunker,
+    MarkdownSectionChunker,
 )
 
-__all__ = [
-    "RecursiveHierarchyChunker",
-    "SectionAwareClinicalChunker",
-]
+__all__ = ["RecursiveHierarchyChunker", "MarkdownSectionChunker"]
