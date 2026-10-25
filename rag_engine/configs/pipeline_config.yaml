@@ -7,3 +7,25 @@ document_store:
 
 ingestion:
   supported_formats: [".pdf", ".md", ".json", ".txt"]
+  normalizers:
+    - name: "unicode_whitespace_cleaner"
+      params:
+        preserve_paragraphs: true
+    - name: "clinical_pii_redactor"
+      params:
+        replacement_token: "[REDACTED]"
+    - name: "arabic_normalizer"
+      params:
+        remove_diacritics: true
+        remove_tatweel: true
+        unify_alef: true
+        unify_yeh: true
+    - name: "medical_abbreviation_expander"
+      params:
+        custom_abbreviations:
+          "ICU": "Intensive Care Unit"
+  chunker:
+    name: "section_aware_chunker"
+    params:
+      chunk_size: 512
+      chunk_overlap: 64

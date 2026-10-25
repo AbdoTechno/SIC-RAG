@@ -1,0 +1,163 @@
+import re
+import hashlib
+from dataclasses import replace
+from typing import List, Optional
+from core.interfaces import BaseChunker
+from core.schemas import RawDocument, DocumentChunk
+from core.registry import registry
+
+
+def _generate_deterministic_chunk_id(doc_id: str, index: int, text: str) -> str:
+    short_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+    return f"{doc_id}_chk_{index}_{short_hash}"
+
+
+@registry.register_chunker("recursive_chunker")
+class RecursiveHierarchyChunker(BaseChunker):
+    """
+    Splits clinical documents recursively using prioritized semantic separators
+    (paragraphs -> lines -> sentences -> words) while maintaining sliding window overlap.
+    """
+
+    def __init__(
+        self,
+        chunk_size: int = 512,
+        chunk_overlap: int = 64,
+        separators: Optional[List[str]] = None,
+    ):
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be strictly positive.")
+        if chunk_overlap < 0 or chunk_overlap >= chunk_size:
+            raise ValueError("chunk_overlap must be >= 0 and < chunk_size.")
+
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.separators = separators or ["\n\n", "\n", ". ", "؟ ", "! ", " "]
+
+    def _split_text(self, text: str) -> List[str]:
+        text = text.strip()
+        if not text:
+            return []
+        if len(text) <= self.chunk_size:
+            return [text]
+
+        # Split into atomic segments based on paragraphs/sentences first
+        pattern = r"(\n\n|\n|(?<=[.؟!])\s+)"
+        raw_parts = re.split(pattern, text)
+        segments = [p for p in raw_parts if p and not p.isspace()]
+
+        chunks: List[str] = []
+        current_chunk = ""
+
+        for seg in segments:
+            candidate = f"{current_chunk} {seg}".strip() if current_chunk else seg.strip()
+            if len(candidate) <= self.chunk_size:
+                current_chunk = candidate
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                    overlap_tail = current_chunk[-self.chunk_overlap :].strip() if self.chunk_overlap > 0 else ""
+                    current_chunk = f"{overlap_tail} {seg}".strip() if overlap_tail else seg.strip()
+                else:
+                    current_chunk = seg.strip()
+
+                # Hard split if a single segment still exceeds chunk_size
+                step = max(1, self.chunk_size - self.chunk_overlap)
+                while len(current_chunk) > self.chunk_size:
+                    chunks.append(current_chunk[: self.chunk_size].strip())
+                    current_chunk = current_chunk[step:].strip()
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks
+
+    def chunk(self, document: RawDocument) -> List[DocumentChunk]:
+        text_Pieces = self._split_text(document.content)
+        result: List[DocumentChunk] = []
+
+        base_section = document.metadata.page_or_section or "Document"
+        for idx, piece in enumerate(text_Pieces):
+            chunk_meta = replace(
+                document.metadata,
+                page_or_section=f"{base_section} | Part {idx + 1}",
+            )
+            chunk_id = _generate_deterministic_chunk_id(document.doc_id, idx, piece)
+            result.append(
+                DocumentChunk(
+                    chunk_id=chunk_id,
+                    doc_id=document.doc_id,
+                    text=piece,
+                    metadata=chunk_meta,
+                )
+            )
+        return result
+
+
+@registry.register_chunker("section_aware_chunker")
+class SectionAwareClinicalChunker(BaseChunker):
+    """
+    Detects Markdown and numbered clinical headings (e.g., '# Pneumonia', '2.1 Pleural Effusion')
+    and binds each section header directly into the chunk's SourceMetadata for accurate citation.
+    """
+
+    HEADER_REGEX = re.compile(r"^(#{1,4}\s+.+|\d+(?:\.\d+)*\s+[A-Z\u0600-\u06FF].+)$", re.MULTILINE)
+
+    def __init__(self, chunk_size: int = 512, chunk_overlap: int = 64):
+        self.inner_chunker = RecursiveHierarchyChunker(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+        )
+
+    def chunk(self, document: RawDocument) -> List[DocumentChunk]:
+        content = document.content.strip()
+        if not content:
+            return []
+
+        matches = list(self.HEADER_REGEX.finditer(content))
+        if not matches:
+            return self.inner_chunker.chunk(document)
+
+        all_chunks: List[DocumentChunk] = []
+        chunk_counter = 0
+
+        # Handle introductory text before the first header if present
+        if matches[0].start() > 0:
+            intro_text = content[: matches[0].start()].strip()
+            if intro_text:
+                intro_doc = RawDocument(
+                    doc_id=document.doc_id,
+                    file_id=document.file_id,
+                    content=intro_text,
+                    metadata=replace(document.metadata, page_or_section="Introduction"),
+                )
+                for c in self.inner_chunker.chunk(intro_doc):
+                    c.chunk_id = _generate_deterministic_chunk_id(document.doc_id, chunk_counter, c.text)
+                    all_chunks.append(c)
+                    chunk_counter += 1
+
+        # Process each clinical section with its exact title
+        for i, match in enumerate(matches):
+            section_title = match.group(1).lstrip("#").strip()
+            start_idx = match.start()
+            end_idx = matches[i + 1].start() if i + 1 < len(matches) else len(content)
+            section_body = content[start_idx:end_idx].strip()
+
+            section_meta = replace(
+                document.metadata,
+                page_or_section=section_title,
+            )
+            section_doc = RawDocument(
+                doc_id=document.doc_id,
+                file_id=document.file_id,
+                content=section_body,
+                metadata=section_meta,
+            )
+
+            sub_chunks = self.inner_chunker.chunk(section_doc)
+            for sub in sub_chunks:
+                sub.chunk_id = _generate_deterministic_chunk_id(document.doc_id, chunk_counter, sub.text)
+                all_chunks.append(sub)
+                chunk_counter += 1
+
+        return all_chunks
