@@ -7,10 +7,20 @@ from core.schemas import RawDocument, DocumentChunk
 from core.registry import registry
 
 
-# deterministic IDs - ensure idempotency
 def _generate_deterministic_chunk_id(doc_id: str, index: int, text: str) -> str:
     short_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
     return f"{doc_id}_chk_{index}_{short_hash}"
+
+
+def _detect_content_type(text: str) -> str:
+    stripped = text.strip()
+    if "|" in stripped and re.search(r"\|[\s:-]+\|", stripped):
+        return "table"
+    if stripped.startswith("```") or "def " in stripped or "class " in stripped:
+        return "code"
+    if re.search(r"^(\s*[-*•]|\s*\d+\.)\s+", stripped, re.MULTILINE):
+        return "list"
+    return "prose"
 
 
 @registry.register_chunker("recursive_chunker")
@@ -72,7 +82,6 @@ class RecursiveHierarchyChunker(BaseChunker):
 
         base_section = document.metadata.page_or_section or "Document"
         for idx, piece in enumerate(text_pieces):
-            # Immutability - we create a new metadata object rather than mutating the original
             chunk_meta = replace(
                 document.metadata,
                 page_or_section=f"{base_section} | Part {idx + 1}",
@@ -82,14 +91,16 @@ class RecursiveHierarchyChunker(BaseChunker):
                 DocumentChunk(
                     chunk_id=chunk_id,
                     doc_id=document.doc_id,
+                    file_id=document.file_id,
+                    chunk_index=idx,
                     text=piece,
                     metadata=chunk_meta,
+                    content_type=_detect_content_type(piece),
                 )
             )
         return result
 
-
-# Decorator/Wrapper Pattern - enhances the recursive chunker with metadata extraction capabilities
+# Decorator/Wrapper Pattern - enhances the recursive chunker with metadata extraction capabilities 
 @registry.register_chunker("markdown_section_chunker")
 class MarkdownSectionChunker(BaseChunker):
     HEADER_REGEX = re.compile(r"^(#{1,4}\s+.+|\d+(?:\.\d+)*\s+[A-Z\u0600-\u06FF].+)$", re.MULTILINE)
@@ -122,6 +133,7 @@ class MarkdownSectionChunker(BaseChunker):
                     metadata=replace(document.metadata, page_or_section="Introduction"),
                 )
                 for c in self.inner_chunker.chunk(intro_doc):
+                    c.chunk_index = chunk_counter
                     c.chunk_id = _generate_deterministic_chunk_id(document.doc_id, chunk_counter, c.text)
                     all_chunks.append(c)
                     chunk_counter += 1
@@ -145,6 +157,7 @@ class MarkdownSectionChunker(BaseChunker):
 
             sub_chunks = self.inner_chunker.chunk(section_doc)
             for sub in sub_chunks:
+                sub.chunk_index = chunk_counter
                 sub.chunk_id = _generate_deterministic_chunk_id(document.doc_id, chunk_counter, sub.text)
                 all_chunks.append(sub)
                 chunk_counter += 1
