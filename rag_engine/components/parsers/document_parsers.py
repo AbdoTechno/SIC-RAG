@@ -1,3 +1,4 @@
+import fitz
 import json
 from typing import List, Dict, Any, Optional
 from core.interfaces import BaseFileParser
@@ -69,18 +70,49 @@ class PlainTextParser(BaseUTF8TextParser):
 
 
 @registry.register_parser(".pdf")
-class PDFStreamParser(BaseFileParser):
-    def parse(self, raw_bytes: bytes, base_metadata: Dict[str, Any], file_id: Optional[str] = None) -> List[RawDocument]:
+class FastPDFStreamParser(BaseFileParser):
+    def parse(
+        self,
+        raw_bytes: bytes,
+        base_metadata: Dict[str, Any],
+        file_id: Optional[str] = None
+    ) -> List[RawDocument]:
         if not raw_bytes:
             raise ValueError("PDF byte stream cannot be empty.")
 
-        extracted_text = raw_bytes.decode("utf-8", errors="ignore").strip() or "Extracted PDF content."
-        meta = SourceMetadata(
-            source_name=base_metadata.get("source_name", "PDF Document"),
-            version_date=str(base_metadata.get("version_date", "N/A")),
-            source_link=base_metadata.get("source_link", "postgres://raw_files"),
-            file_format="pdf",
-            page_or_section="Page 1",
-            extra=base_metadata.get("extra", {}),
-        )
-        return [RawDocument(content=extracted_text, metadata=meta, file_id=file_id)]
+        raw_docs: List[RawDocument] = []
+        try:
+            # Open PDF directly from RAM buffer without touching disk
+            with fitz.open(stream=raw_bytes, filetype="pdf") as doc:
+                for page_idx in range(len(doc)):
+                    page = doc[page_idx]
+                    # Extract text maintaining reading-order block structure
+                    page_text = page.get_text("text").strip()
+                    if not page_text:
+                        continue
+
+                    # Sanitize null bytes at extraction boundary
+                    page_text = page_text.replace("\x00", "")
+
+                    meta = SourceMetadata(
+                        source_name=base_metadata.get("source_name", "PDF Document"),
+                        version_date=str(base_metadata.get("version_date", "N/A")),
+                        source_link=base_metadata.get("source_link", "postgres://raw_files"),
+                        file_format="pdf",
+                        page_or_section=f"Page {page_idx + 1}",
+                        extra={**base_metadata.get("extra", {}), "page_number": page_idx + 1},
+                    )
+                    raw_docs.append(
+                        RawDocument(
+                            content=page_text,
+                            metadata=meta,
+                            file_id=file_id,
+                        )
+                    )
+        except Exception as e:
+            raise ValueError(f"Failed to parse PDF binary stream: {str(e)}")
+
+        if not raw_docs:
+            raise ValueError("PDF contained no extractable textual content.")
+
+        return raw_docs
