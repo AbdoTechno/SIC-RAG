@@ -107,3 +107,8 @@ class BaseReranker(ABC):
     @abstractmethod
     def rerank(self, query: str, chunks: List[DocumentChunk], top_k: Optional[int] = None) -> List[DocumentChunk]:
         pass
+
+class BaseGenerator(ABC):
+    @abstractmethod
+    def generate(self, query: str, context_chunks: List[Any]) -> Dict[str, Any]:
+        pass

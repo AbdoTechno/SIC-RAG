@@ -100,3 +100,12 @@ class RetrievalEvalReport:
     context_precision_at_k: float
     abstention_accuracy: float
     per_query_details: List[Dict[str, Any]]
+
+@dataclass
+class GenerationResult:
+    query: str
+    answer: str
+    sources_cited: List[Dict[str, Any]]
+    abstained: bool
+    model_name: str
+    token_usage: Dict[str, int] = field(default_factory=dict)

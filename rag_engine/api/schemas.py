@@ -64,3 +64,11 @@ class RetrievalEvaluationRequest(BaseModel):
     mode: str = Field(default="hybrid", pattern="^(hybrid|semantic|lexical)$")
     file_id_filter: Optional[str] = None
     test_cases: List[EvalCaseInput]
+
+
+class RAGGenerateRequest(BaseModel):
+    query: str = Field(..., min_length=1, description="User question to answer using retrieved evidence")
+    top_k: int = Field(default=3, ge=1, le=15, description="Number of top reranked chunks to pass to the LLM")
+    mode: str = Field(default="hybrid", pattern="^(hybrid|semantic|lexical)$")
+    file_id_filter: Optional[str] = Field(default=None, description="Optional file_id to scope the search")
+    abstention_threshold_override: Optional[float] = Field(default=None, ge=0.0, le=1.0)

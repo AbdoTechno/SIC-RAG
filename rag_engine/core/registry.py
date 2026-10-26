@@ -7,10 +7,10 @@ from core.interfaces import (
     BaseEmbedder,
     BaseVectorStore,
     BaseReranker,
+    BaseGenerator,
 )
 
 
-# Design Pattern: Singleton + Factory Registry. Binds declarative string keys to concrete classes at runtime.
 class ComponentRegistry:
     def __init__(self):
         self._parsers: Dict[str, Type[BaseFileParser]] = {}
@@ -20,6 +20,7 @@ class ComponentRegistry:
         self._embedders: Dict[str, Type[BaseEmbedder]] = {}
         self._vector_stores: Dict[str, Type[BaseVectorStore]] = {}
         self._rerankers: Dict[str, Type[BaseReranker]] = {}
+        self._generators: Dict[str, Type[BaseGenerator]] = {}
 
     def register_parser(self, ext: str):
         ext_key = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
@@ -113,6 +114,19 @@ class ComponentRegistry:
         if name not in self._rerankers:
             raise KeyError(f"No reranker registered under '{name}'")
         return self._rerankers[name]
+
+    def register_generator(self, name: str):
+        def decorator(cls: Type[BaseGenerator]):
+            if not issubclass(cls, BaseGenerator):
+                raise TypeError(f"{cls.__name__} must inherit from BaseGenerator")
+            self._generators[name] = cls
+            return cls
+        return decorator
+
+    def get_generator(self, name: str) -> Type[BaseGenerator]:
+        if name not in self._generators:
+            raise KeyError(f"No generator registered under '{name}'")
+        return self._generators[name]
 
 
 registry = ComponentRegistry()

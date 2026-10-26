@@ -5,8 +5,15 @@ from typing import Dict, Any, Optional
 from fastapi import FastAPI
 from pipeline.ingestion_pipeline import IngestionPipeline
 from pipeline.retrieval_pipeline import RetrievalPipeline
+from pipeline.rag_pipeline import EndToEndRAGPipeline
 
-from api.routers import health_router, documents_router, chunks_router, retrieval_router
+from api.routers import (
+    health_router,
+    documents_router,
+    chunks_router,
+    retrieval_router,
+    generation_router,
+)
 
 
 def load_default_config() -> Dict[str, Any]:
@@ -33,11 +40,12 @@ def load_default_config() -> Dict[str, Any]:
 def create_app(
     pipeline: Optional[IngestionPipeline] = None,
     retrieval_pipeline: Optional[RetrievalPipeline] = None,
+    rag_pipeline: Optional[EndToEndRAGPipeline] = None,
 ) -> FastAPI:
     app = FastAPI(
-        title="Enterprise RAG Engine - Ingestion, Retrieval & Evaluation API",
-        version="2.5.0",
-        description="Modular REST API for document ingestion, idempotent chunking, hybrid retrieval, and RAG evaluation.",
+        title="Enterprise RAG Engine - End-to-End API",
+        version="3.0.0",
+        description="Modular REST API for ingestion, hybrid retrieval, quantitative evaluation, and Groq LLM generation.",
     )
 
     cfg = load_default_config()
@@ -46,14 +54,20 @@ def create_app(
         config=cfg,
         document_store=active_ingest.store,
     )
+    active_rag = rag_pipeline or EndToEndRAGPipeline(
+        config=cfg,
+        retrieval_pipeline=active_retrieval,
+    )
 
     app.state.pipeline = active_ingest
     app.state.retrieval_pipeline = active_retrieval
+    app.state.rag_pipeline = active_rag
 
     app.include_router(health_router.router)
     app.include_router(documents_router.router)
     app.include_router(chunks_router.router)
     app.include_router(retrieval_router.router)
+    app.include_router(generation_router.router)
 
     return app
 

@@ -36,7 +36,7 @@ ingestion:
       chunk_overlap: 64
 
 retrieval:
-  abstention_threshold: 0.25
+  abstention_threshold: 0.42
   embedder:
     name: "hash_embedder"
     params:
@@ -52,3 +52,10 @@ retrieval:
     params:
       semantic_weight: 0.45
       lexical_weight: 0.55
+
+generation:
+  name: "groq_generator"
+  params:
+    model_name: "llama-3.3-70b-versatile"
+    temperature: 0.1
+    max_tokens: 1024
