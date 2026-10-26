@@ -45,5 +45,5 @@ def test_registry_rejects_class_not_inheriting_interface():
 
 def test_registry_raises_key_error_for_unregistered_format():
     temp_registry = ComponentRegistry()
-    with pytest.raises(KeyError, match="Unsupported file format '.xyz'"):
+    with pytest.raises(KeyError, match="No parser registered for extension '.xyz'"):
         temp_registry.get_parser(".xyz")

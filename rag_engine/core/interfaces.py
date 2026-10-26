@@ -9,7 +9,6 @@ class BaseFileParser(ABC):
         pass
 
 
-# Repository Pattern - abstracts all database CRUD and chunk persistence logic.
 class BaseDocumentStore(ABC):
     @abstractmethod
     def check_health(self) -> Dict[str, Any]:
@@ -60,7 +59,13 @@ class BaseChunker(ABC):
         pass
 
 
+# Design Pattern: Adapter Pattern. Unifies local ONNX/Transformer models and external embedding APIs.
 class BaseEmbedder(ABC):
+    @property
+    @abstractmethod
+    def dimension(self) -> int:
+        pass
+
     @abstractmethod
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         pass
@@ -70,7 +75,35 @@ class BaseEmbedder(ABC):
         pass
 
 
+# Design Pattern: Repository Pattern. Abstracts vector indexing, ANN search, and hybrid RRF fusion.
+class BaseVectorStore(ABC):
+    @abstractmethod
+    def upsert_chunks(self, chunks: List[DocumentChunk]) -> int:
+        pass
+
+    @abstractmethod
+    def search(
+        self,
+        query_embedding: List[float],
+        query_text: str,
+        top_k: int = 5,
+        mode: str = "hybrid",
+        file_id_filter: Optional[str] = None,
+        content_type_filter: Optional[str] = None,
+    ) -> List[DocumentChunk]:
+        pass
+
+    @abstractmethod
+    def delete_by_file_id(self, file_id: str) -> int:
+        pass
+
+    @abstractmethod
+    def count_vectors(self, file_id: Optional[str] = None) -> int:
+        pass
+
+
+# Design Pattern: Strategy Pattern. Scores and re-orders candidate chunks for precision and abstention gating.
 class BaseReranker(ABC):
     @abstractmethod
-    def rerank(self, query: str, chunks: List[DocumentChunk]) -> List[DocumentChunk]:
+    def rerank(self, query: str, chunks: List[DocumentChunk], top_k: Optional[int] = None) -> List[DocumentChunk]:
         pass

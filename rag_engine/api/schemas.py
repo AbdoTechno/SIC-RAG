@@ -41,3 +41,26 @@ class ChunkListResponse(BaseModel):
     limit: int
     offset: int
     chunks: List[Dict[str, Any]]
+
+
+class SearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, description="Search query")
+    top_k: int = Field(default=5, ge=1, le=50)
+    mode: str = Field(default="hybrid", pattern="^(hybrid|semantic|lexical)$")
+    file_id_filter: Optional[str] = None
+    content_type_filter: Optional[str] = None
+    abstention_threshold_override: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+
+
+class EvalCaseInput(BaseModel):
+    query: str
+    expected_keywords: List[str] = Field(default_factory=list)
+    expected_section_substr: Optional[str] = None
+    should_abstain: bool = False
+
+
+class RetrievalEvaluationRequest(BaseModel):
+    top_k: int = Field(default=5, ge=1, le=20)
+    mode: str = Field(default="hybrid", pattern="^(hybrid|semantic|lexical)$")
+    file_id_filter: Optional[str] = None
+    test_cases: List[EvalCaseInput]

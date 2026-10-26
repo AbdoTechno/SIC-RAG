@@ -5,96 +5,114 @@ from core.interfaces import (
     BaseTextNormalizer,
     BaseChunker,
     BaseEmbedder,
+    BaseVectorStore,
     BaseReranker,
 )
 
+
+# Design Pattern: Singleton + Factory Registry. Binds declarative string keys to concrete classes at runtime.
 class ComponentRegistry:
     def __init__(self):
         self._parsers: Dict[str, Type[BaseFileParser]] = {}
-        self._doc_stores: Dict[str, Type[BaseDocumentStore]] = {}
+        self._document_stores: Dict[str, Type[BaseDocumentStore]] = {}
         self._normalizers: Dict[str, Type[BaseTextNormalizer]] = {}
         self._chunkers: Dict[str, Type[BaseChunker]] = {}
         self._embedders: Dict[str, Type[BaseEmbedder]] = {}
+        self._vector_stores: Dict[str, Type[BaseVectorStore]] = {}
         self._rerankers: Dict[str, Type[BaseReranker]] = {}
 
-    def register_parser(self, extension: str):
-        ext = extension.lower().strip()
-        if not ext.startswith("."):
-            ext = f".{ext}"
-
+    def register_parser(self, ext: str):
+        ext_key = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
         def decorator(cls: Type[BaseFileParser]):
             if not issubclass(cls, BaseFileParser):
                 raise TypeError(f"{cls.__name__} must inherit from BaseFileParser")
-            self._parsers[ext] = cls
+            self._parsers[ext_key] = cls
             return cls
         return decorator
 
+    def get_parser(self, ext: str) -> Type[BaseFileParser]:
+        ext_key = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+        if ext_key not in self._parsers:
+            raise KeyError(f"No parser registered for extension '{ext_key}'")
+        return self._parsers[ext_key]
+
     def register_document_store(self, name: str):
-        key = name.lower().strip()
         def decorator(cls: Type[BaseDocumentStore]):
             if not issubclass(cls, BaseDocumentStore):
                 raise TypeError(f"{cls.__name__} must inherit from BaseDocumentStore")
-            self._doc_stores[key] = cls
+            self._document_stores[name] = cls
             return cls
         return decorator
 
+    def get_document_store(self, name: str) -> Type[BaseDocumentStore]:
+        if name not in self._document_stores:
+            raise KeyError(f"No document store registered under '{name}'")
+        return self._document_stores[name]
+
     def register_normalizer(self, name: str):
-        key = name.lower().strip()
         def decorator(cls: Type[BaseTextNormalizer]):
             if not issubclass(cls, BaseTextNormalizer):
                 raise TypeError(f"{cls.__name__} must inherit from BaseTextNormalizer")
-            self._normalizers[key] = cls
+            self._normalizers[name] = cls
             return cls
         return decorator
 
+    def get_normalizer(self, name: str) -> Type[BaseTextNormalizer]:
+        if name not in self._normalizers:
+            raise KeyError(f"No normalizer registered under '{name}'")
+        return self._normalizers[name]
+
     def register_chunker(self, name: str):
-        key = name.lower().strip()
         def decorator(cls: Type[BaseChunker]):
             if not issubclass(cls, BaseChunker):
                 raise TypeError(f"{cls.__name__} must inherit from BaseChunker")
-            self._chunkers[key] = cls
+            self._chunkers[name] = cls
             return cls
         return decorator
 
+    def get_chunker(self, name: str) -> Type[BaseChunker]:
+        if name not in self._chunkers:
+            raise KeyError(f"No chunker registered under '{name}'")
+        return self._chunkers[name]
+
+    def register_embedder(self, name: str):
+        def decorator(cls: Type[BaseEmbedder]):
+            if not issubclass(cls, BaseEmbedder):
+                raise TypeError(f"{cls.__name__} must inherit from BaseEmbedder")
+            self._embedders[name] = cls
+            return cls
+        return decorator
+
+    def get_embedder(self, name: str) -> Type[BaseEmbedder]:
+        if name not in self._embedders:
+            raise KeyError(f"No embedder registered under '{name}'")
+        return self._embedders[name]
+
+    def register_vector_store(self, name: str):
+        def decorator(cls: Type[BaseVectorStore]):
+            if not issubclass(cls, BaseVectorStore):
+                raise TypeError(f"{cls.__name__} must inherit from BaseVectorStore")
+            self._vector_stores[name] = cls
+            return cls
+        return decorator
+
+    def get_vector_store(self, name: str) -> Type[BaseVectorStore]:
+        if name not in self._vector_stores:
+            raise KeyError(f"No vector store registered under '{name}'")
+        return self._vector_stores[name]
+
     def register_reranker(self, name: str):
-        key = name.lower().strip()
         def decorator(cls: Type[BaseReranker]):
             if not issubclass(cls, BaseReranker):
                 raise TypeError(f"{cls.__name__} must inherit from BaseReranker")
-            self._rerankers[key] = cls
+            self._rerankers[name] = cls
             return cls
         return decorator
 
-    def get_parser(self, extension: str) -> Type[BaseFileParser]:
-        ext = extension.lower().strip()
-        if not ext.startswith("."):
-            ext = f".{ext}"
-        if ext not in self._parsers:
-            raise KeyError(f"Unsupported file format '{ext}'. Registered: {list(self._parsers.keys())}")
-        return self._parsers[ext]
-
-    def get_document_store(self, name: str) -> Type[BaseDocumentStore]:
-        key = name.lower().strip()
-        if key not in self._doc_stores:
-            raise KeyError(f"Unknown document store '{key}'. Registered: {list(self._doc_stores.keys())}")
-        return self._doc_stores[key]
-
-    def get_normalizer(self, name: str) -> Type[BaseTextNormalizer]:
-        key = name.lower().strip()
-        if key not in self._normalizers:
-            raise KeyError(f"Unknown normalizer '{key}'. Registered: {list(self._normalizers.keys())}")
-        return self._normalizers[key]
-
-    def get_chunker(self, name: str) -> Type[BaseChunker]:
-        key = name.lower().strip()
-        if key not in self._chunkers:
-            raise KeyError(f"Unknown chunker '{key}'. Registered: {list(self._chunkers.keys())}")
-        return self._chunkers[key]
-
     def get_reranker(self, name: str) -> Type[BaseReranker]:
-        key = name.lower().strip()
-        if key not in self._rerankers:
-            raise KeyError(f"Unknown reranker '{key}'. Registered: {list(self._rerankers.keys())}")
-        return self._rerankers[key]
+        if name not in self._rerankers:
+            raise KeyError(f"No reranker registered under '{name}'")
+        return self._rerankers[name]
+
 
 registry = ComponentRegistry()
