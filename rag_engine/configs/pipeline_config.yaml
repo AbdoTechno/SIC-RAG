@@ -3,7 +3,7 @@ pipeline_name: "enterprise_rag_engine"
 document_store:
   provider: "postgres_store"
   params:
-    dsn: "postgresql://postgres:postgres@localhost:5432/rag_db"
+    dsn: "postgresql://postgres:postgres@localhost:5433/rag_db"
 
 ingestion:
   supported_formats: [".pdf", ".md", ".json", ".txt"]
