@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+from psycopg_pool import ConnectionPool
 
 from core.interfaces import BaseDocumentStore
 from core.schemas import StoredRawFile, RawDocument, DocumentChunk, SourceMetadata
@@ -32,14 +33,31 @@ def _dict_to_metadata(data: dict) -> SourceMetadata:
     )
 
 
+# Object Pool + Repository Pattern - ususes live TCP connections via ConnectionPool for high concurrency
 @registry.register_document_store("postgres_store")
 class PostgresDocumentStore(BaseDocumentStore):
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str, min_size: int = 1, max_size: int = 10, use_pool: bool = True):
         self.dsn = dsn
+        self.use_pool = use_pool
+        self._pool: Optional[ConnectionPool] = None
+        if self.use_pool:
+            self._pool = ConnectionPool(
+                conninfo=self.dsn,
+                min_size=min_size,
+                max_size=max_size,
+                kwargs={"row_factory": dict_row},
+                open=True,
+            )
         self._create_tables()
 
     def _get_connection(self):
+        if self._pool is not None:
+            return self._pool.connection()
         return psycopg.connect(self.dsn, row_factory=dict_row)
+
+    def close(self) -> None:
+        if self._pool is not None:
+            self._pool.close()
 
     def _create_tables(self) -> None:
         with self._get_connection() as conn:
@@ -459,3 +477,4 @@ class SQLiteDocumentStore(BaseDocumentStore):
             )
             for r in cur.fetchall()
         ]
+    

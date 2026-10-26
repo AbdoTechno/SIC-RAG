@@ -23,7 +23,7 @@ def test_postgres_store_executes_bytea_and_jsonb_upsert(mock_connect):
     mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
 
     store_cls = registry.get_document_store("postgres_store")
-    store = store_cls(dsn="postgresql://user:pass@localhost:5432/rag_db")
+    store = store_cls(dsn="postgresql://user:pass@localhost:5432/rag_db", use_pool=False)
 
     meta = SourceMetadata(
         source_name="WHO Chest X-Ray Guideline",
