@@ -21,6 +21,7 @@ def load_default_config() -> Dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
 
+    # Database Overrides
     env_provider = os.getenv("RAG_STORE_PROVIDER")
     env_dsn = os.getenv("RAG_DB_DSN")
     if env_provider:
@@ -34,6 +35,21 @@ def load_default_config() -> Dict[str, Any]:
         cfg["document_store"]["params"]["dsn"] = env_dsn
         if cfg.get("retrieval", {}).get("vector_store", {}).get("provider") == "pgvector_store":
             cfg["retrieval"]["vector_store"]["params"]["dsn"] = env_dsn
+            
+    # SWE Fix: LLM Generation Overrides via Environment Variables
+    env_llm_model = os.getenv("RAG_LLM_MODEL")
+    env_llm_temp = os.getenv("RAG_LLM_TEMP")
+    env_llm_tokens = os.getenv("RAG_LLM_MAX_TOKENS")
+    
+    if env_llm_model or env_llm_temp or env_llm_tokens:
+        gen_params = cfg.setdefault("generation", {}).setdefault("params", {})
+        if env_llm_model:
+            gen_params["model_name"] = env_llm_model
+        if env_llm_temp:
+            gen_params["temperature"] = float(env_llm_temp)
+        if env_llm_tokens:
+            gen_params["max_tokens"] = int(env_llm_tokens)
+
     return cfg
 
 
@@ -45,7 +61,7 @@ def create_app(
     app = FastAPI(
         title="Enterprise RAG Engine - End-to-End API",
         version="3.0.0",
-        description="Modular REST API for ingestion, hybrid retrieval, quantitative evaluation, and Groq LLM generation.",
+        description="Modular REST API for ingestion, hybrid retrieval, quantitative evaluation, and LLM generation.",
     )
 
     cfg = load_default_config()
