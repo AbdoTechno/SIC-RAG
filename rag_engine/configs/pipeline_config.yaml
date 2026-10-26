@@ -11,6 +11,10 @@ ingestion:
     - name: "unicode_whitespace_cleaner"
       params:
         preserve_paragraphs: true
+    - name: "regex_noise_cleaner"
+      params:
+        patterns_to_remove: 
+          - 'RAG Systems Evaluation Framework\s*Page \d+ of \d+'
     - name: "regex_pii_redactor"
       params:
         replacement_token: "[REDACTED]"

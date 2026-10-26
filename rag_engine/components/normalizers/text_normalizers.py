@@ -120,3 +120,18 @@ class NormalizerChain:
                 )
             )
         return normalized_docs
+
+
+
+
+@registry.register_normalizer("regex_noise_cleaner")
+class RegexNoiseCleaner(BaseTextNormalizer):
+    def __init__(self, patterns_to_remove: List[str]):
+        self.patterns = [re.compile(p, re.IGNORECASE | re.MULTILINE) for p in patterns_to_remove]
+
+    def normalize(self, text: str) -> str:
+        if not text:
+            return ""
+        for pattern in self.patterns:
+            text = pattern.sub("", text)
+        return text.strip()

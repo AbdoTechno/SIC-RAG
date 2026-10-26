@@ -68,8 +68,17 @@ class RecursiveHierarchyChunker(BaseChunker):
 
                 step = max(1, self.chunk_size - self.chunk_overlap)
                 while len(current_chunk) > self.chunk_size:
-                    chunks.append(current_chunk[: self.chunk_size].strip())
-                    current_chunk = current_chunk[step:].strip()
+                    # SWE Decision: Look-back for safe boundary (space or newline) to prevent word slicing
+                    cut_point = self.chunk_size
+                    while cut_point > 0 and current_chunk[cut_point - 1] not in " \n\t":
+                        cut_point -= 1
+                    
+                    # If no safe space found, fallback to hard cut
+                    if cut_point == 0:
+                        cut_point = self.chunk_size
+                        
+                    chunks.append(current_chunk[:cut_point].strip())
+                    current_chunk = current_chunk[cut_point - self.chunk_overlap:].strip()
 
         if current_chunk:
             chunks.append(current_chunk)

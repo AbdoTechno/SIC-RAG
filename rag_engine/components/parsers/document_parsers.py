@@ -1,4 +1,5 @@
 import fitz
+import pymupdf4llm
 import json
 from typing import List, Dict, Any, Optional
 from core.interfaces import BaseFileParser
@@ -116,3 +117,31 @@ class FastPDFStreamParser(BaseFileParser):
             raise ValueError("PDF contained no extractable textual content.")
 
         return raw_docs
+
+
+@registry.register_parser(".pdf")
+class MarkdownPDFStreamParser(BaseFileParser):
+    def parse(self, raw_bytes: bytes, base_metadata: Dict[str, Any], file_id: Optional[str] = None) -> List[RawDocument]:
+        if not raw_bytes:
+            raise ValueError("PDF byte stream cannot be empty.")
+
+        try:
+            # Load into PyMuPDF
+            doc = fitz.open(stream=raw_bytes, filetype="pdf")
+            # Convert directly to structured Markdown (preserves tables and headers)
+            md_text = pymupdf4llm.to_markdown(doc)
+            md_text = md_text.replace("\x00", "")
+
+            meta = SourceMetadata(
+                source_name=base_metadata.get("source_name", "PDF Document"),
+                version_date=str(base_metadata.get("version_date", "N/A")),
+                source_link=base_metadata.get("source_link", "postgres://raw_files"),
+                file_format="pdf",
+                page_or_section="Full Document", 
+                extra=base_metadata.get("extra", {}),
+            )
+            # Return as a single structured document for the MarkdownSectionChunker to split logically
+            return [RawDocument(content=md_text, metadata=meta, file_id=file_id)]
+            
+        except Exception as e:
+            raise ValueError(f"Failed to parse PDF to Markdown: {str(e)}")
