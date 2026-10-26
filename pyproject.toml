@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.162.0",
+    "groq>=1.7.0",
     "psycopg[binary,pool]>=3.3.6",
     "pymupdf>=2.0",
     "pymupdf4llm>=2.0",
