@@ -13,7 +13,7 @@ ingestion:
         preserve_paragraphs: true
     - name: "regex_noise_cleaner"
       params:
-        patterns_to_remove: 
+        patterns_to_remove:
           - 'RAG Systems Evaluation Framework\s*Page \d+ of \d+'
     - name: "regex_pii_redactor"
       params:
@@ -34,3 +34,21 @@ ingestion:
     params:
       chunk_size: 512
       chunk_overlap: 64
+
+retrieval:
+  abstention_threshold: 0.25
+  embedder:
+    name: "hash_embedder"
+    params:
+      dim: 384
+  vector_store:
+    provider: "pgvector_store"
+    params:
+      dsn: "postgresql://postgres:postgres@localhost:5433/rag_db"
+      dimension: 384
+      rrf_k: 60
+  reranker:
+    name: "hybrid_overlap_reranker"
+    params:
+      semantic_weight: 0.45
+      lexical_weight: 0.55
