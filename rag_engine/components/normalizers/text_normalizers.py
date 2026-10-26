@@ -5,8 +5,6 @@ from core.interfaces import BaseTextNormalizer
 from core.schemas import RawDocument
 from core.registry import registry
 
-
-# SRP - Each normalizer does exactly one thing
 @registry.register_normalizer("unicode_whitespace_cleaner")
 class UnicodeWhitespaceNormalizer(BaseTextNormalizer):
     def __init__(self, preserve_paragraphs: bool = True):
@@ -15,6 +13,10 @@ class UnicodeWhitespaceNormalizer(BaseTextNormalizer):
     def normalize(self, text: str) -> str:
         if not text:
             return ""
+        
+        # SWE Fix: Strip NUL bytes (0x00) to prevent PostgreSQL DataError
+        text = text.replace("\x00", "")
+        
         text = unicodedata.normalize("NFKC", text)
         text = re.sub(r"[\u200b\u200c\u200d\ufeff]", "", text)
 
@@ -54,7 +56,6 @@ class ArabicTextNormalizer(BaseTextNormalizer):
         return text
 
 
-# Strategy Pattern - expansion logic is injected via custom_abbreviations dictionary.
 @registry.register_normalizer("dictionary_abbreviation_expander")
 class DictionaryAbbreviationNormalizer(BaseTextNormalizer):
     def __init__(self, custom_abbreviations: Optional[Dict[str, str]] = None):
@@ -69,7 +70,6 @@ class DictionaryAbbreviationNormalizer(BaseTextNormalizer):
         return text
 
 
-# OCP - new regex patterns can be added without changing the core.
 @registry.register_normalizer("regex_pii_redactor")
 class RegexPIIRedactor(BaseTextNormalizer):
     def __init__(self, replacement_token: str = "[REDACTED]"):
@@ -92,7 +92,6 @@ class RegexPIIRedactor(BaseTextNormalizer):
         return text
 
 
-# Chain of Responsibility - executes a dynamic list of normalizers sequentially
 class NormalizerChain:
     def __init__(self, chain_config: List[Dict[str, Any]]):
         self.steps: List[BaseTextNormalizer] = []
