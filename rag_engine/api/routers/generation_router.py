@@ -6,6 +6,24 @@ from pipeline.rag_pipeline import EndToEndRAGPipeline
 router = APIRouter(tags=["RAG Generation (Groq LLM)"])
 
 
+@router.get("/rag/models", status_code=status.HTTP_200_OK)
+def get_available_llm_models(
+    rag_pipeline: EndToEndRAGPipeline = Depends(get_rag_pipeline),
+):
+    try:
+        available = (
+            rag_pipeline.generator.list_available_models()
+            if hasattr(rag_pipeline.generator, "list_available_models")
+            else [getattr(rag_pipeline.generator, "model_name", "unknown")]
+        )
+        return {
+            "configured_model": getattr(rag_pipeline.generator, "model_name", "unknown"),
+            "available_models": available,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 @router.post("/rag/generate", status_code=status.HTTP_200_OK)
 def generate_rag_answer(
     req: RAGGenerateRequest,
