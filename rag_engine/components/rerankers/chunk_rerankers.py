@@ -1,44 +1,57 @@
 import re
-from dataclasses import replace
-from typing import List, Optional
+from typing import List, Set
 from core.interfaces import BaseReranker
-from core.schemas import DocumentChunk
+from core.schemas import ScoredChunk
 from core.registry import registry
+
+STOPWORDS: Set[str] = {
+    "what", "is", "are", "how", "does", "do", "the", "a", "an", "in", "on", "of",
+    "to", "for", "and", "or", "with", "by", "from", "about", "explain", "tell",
+    "me", "work", "works", "working", "can", "you", "who", "where", "when", "why"
+}
+
+
+def _extract_meaningful_stems(text: str) -> Set[str]:
+    raw_tokens = re.findall(r"[a-zA-Z0-9_\u0600-\u06FF]{2,}", text.lower())
+    stems = set()
+    for t in raw_tokens:
+        if t in STOPWORDS:
+            continue
+        stem = re.sub(r"(ing|ed|es|s)$", "", t) if len(t) > 4 else t
+        stems.add(stem)
+    return stems
 
 
 @registry.register_reranker("hybrid_overlap_reranker")
 class HybridOverlapReranker(BaseReranker):
-    def __init__(self, semantic_weight: float = 0.45, lexical_weight: float = 0.55):
+    def __init__(self, semantic_weight: float = 0.60, lexical_weight: float = 0.40):
         self.semantic_weight = semantic_weight
         self.lexical_weight = lexical_weight
 
-    def _compute_rerank_score(self, query: str, chunk: DocumentChunk) -> float:
-        q_tokens = re.findall(r"[a-z0-9\u0600-\u06ff]+(?:-[a-z0-9\u0600-\u06ff]+)*", query.lower())
-        if not q_tokens:
-            return 0.0
-
-        text_lower = chunk.text.lower()
-        section_lower = (chunk.metadata.page_or_section or "").lower()
-        combined_text = f"{section_lower} {text_lower}"
-
-        matched = sum(1 for t in set(q_tokens) if t in combined_text)
-        coverage = matched / len(set(q_tokens))
-
-        # Bigram phrase bonus for high precision
-        bigrams = [f"{q_tokens[i]} {q_tokens[i+1]}" for i in range(len(q_tokens) - 1)]
-        phrase_bonus = 0.15 if (bigrams and any(bg in combined_text for bg in bigrams)) else 0.0
-
-        sem_sim = max(0.0, chunk.similarity_score or 0.0)
-        raw_score = (self.lexical_weight * coverage) + (self.semantic_weight * sem_sim) + phrase_bonus
-        return round(min(1.0, raw_score), 4)
-
-    def rerank(self, query: str, chunks: List[DocumentChunk], top_k: Optional[int] = None) -> List[DocumentChunk]:
-        if not chunks:
+    def rerank(self, query: str, candidates: List[ScoredChunk], top_k: int = 5) -> List[ScoredChunk]:
+        if not candidates:
             return []
 
-        reranked = [
-            replace(c, rerank_score=self._compute_rerank_score(query, c))
-            for c in chunks
-        ]
-        reranked.sort(key=lambda x: x.rerank_score or 0.0, reverse=True)
-        return reranked[:top_k] if top_k else reranked
+        q_stems = _extract_meaningful_stems(query)
+        if not q_stems:
+            q_stems = set(re.findall(r"[a-zA-Z0-9_\u0600-\u06FF]{2,}", query.lower()))
+
+        for cand in candidates:
+            c_stems = _extract_meaningful_stems(cand.text)
+            sec_stems = _extract_meaningful_stems(cand.metadata.page_or_section or "")
+
+            overlap_ratio = len(q_stems & c_stems) / len(q_stems) if q_stems else 0.0
+            section_boost = 0.15 if (q_stems & sec_stems) else 0.0
+
+            sem_clamped = max(0.0, min(1.0, cand.similarity_score))
+            lex_combined = max(cand.lexical_score, overlap_ratio)
+
+            final_score = (
+                (self.semantic_weight * sem_clamped)
+                + (self.lexical_weight * lex_combined)
+                + section_boost
+            )
+            cand.rerank_score = round(min(1.0, final_score), 4)
+
+        ranked = sorted(candidates, key=lambda x: x.rerank_score, reverse=True)
+        return ranked[:top_k]

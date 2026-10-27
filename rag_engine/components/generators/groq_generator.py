@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from core.interfaces import BaseGenerator
@@ -18,7 +19,7 @@ def _load_dotenv_override() -> None:
 @registry.register_generator("groq_generator")
 class GroqGenerator(BaseGenerator):
     EXCLUDED_KEYWORDS = ("whisper", "orpheus", "tts", "guard", "playai", "embed")
-    PREFERRED_DEFAULTS = ("allam-2-7b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "openai/gpt-oss-120b")
+    PREFERRED_DEFAULTS = ("qwen/qwen3.8-27b", "openai/gpt-oss-120b", "allam-2-7b", "openai/gpt-oss-20b")
 
     def __init__(
         self,
@@ -78,12 +79,19 @@ class GroqGenerator(BaseGenerator):
         )
 
         system_prompt = (
-            "You are a precise, evidence-grounded AI assistant. Answer the user's question strictly using ONLY the provided context chunks. "
-            "Every factual claim MUST include an inline citation in the format [Source X] corresponding to the source block. "
-            "Do not extrapolate or invent facts outside the context. If the provided chunks do not answer the question, state clearly that the evidence is insufficient."
+            "You are a strict, evidence-based technical AI assistant.\n"
+            "RULES:\n"
+            "1. Answer the question using ONLY the provided Context Chunks.\n"
+            "2. You MUST cite the exact source number at the end of every factual sentence using the bracketed format [Source 1], [Source 2], etc.\n"
+            "3. Example of required citation style: 'The Transformer architecture was introduced by Ashish Vaswani at Google Brain in June 2017 [Source 1].'\n"
+            "4. Never use outside knowledge. If the context does not contain the answer, state clearly that the provided documents do not cover that specific detail."
         )
 
-        user_prompt = f"Context Chunks:\n{context_text}\n\nQuestion: {query}\n\nEvidence-Linked Answer:"
+        user_prompt = (
+            f"Context Chunks:\n{context_text}\n\n"
+            f"Question: {query}\n\n"
+            "Provide a clear answer with mandatory inline [Source X] citations:"
+        )
 
         response = client.chat.completions.create(
             model=active_model,
@@ -95,7 +103,7 @@ class GroqGenerator(BaseGenerator):
             max_tokens=self.max_tokens,
         )
 
-        answer = response.choices[0].message.content or ""
+        answer = (response.choices[0].message.content or "").strip()
         usage = {
             "prompt_tokens": getattr(response.usage, "prompt_tokens", 0),
             "completion_tokens": getattr(response.usage, "completion_tokens", 0),
@@ -103,7 +111,7 @@ class GroqGenerator(BaseGenerator):
         }
 
         return {
-            "answer": answer.strip(),
+            "answer": answer,
             "model_name": active_model,
             "token_usage": usage,
         }
