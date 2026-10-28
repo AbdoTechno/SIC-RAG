@@ -4,6 +4,8 @@ document_store:
   provider: "postgres_store"
   params:
     dsn: "postgresql://postgres:postgres@localhost:5433/rag_db"
+    min_size: 1
+    max_size: 3
 
 ingestion:
   supported_formats: [".pdf", ".md", ".json", ".txt"]
@@ -47,6 +49,8 @@ retrieval:
       dsn: "postgresql://postgres:postgres@localhost:5433/rag_db"
       dimension: 384
       rrf_k: 60
+      min_size: 1
+      max_size: 3
   reranker:
     name: "hybrid_overlap_reranker"
     params:

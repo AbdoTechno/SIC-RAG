@@ -133,7 +133,15 @@ class InMemoryHybridVectorStore(BaseVectorStore):
 # System Design Decision: Native PostgreSQL pgvector with HNSW index for scalable ANN search without external infra overhead.
 @registry.register_vector_store("pgvector_store")
 class PgVectorHybridStore(BaseVectorStore):
-    def __init__(self, dsn: str, dimension: int = 384, rrf_k: int = 60, use_pool: bool = True):
+    def __init__(
+        self,
+        dsn: str,
+        dimension: int = 384,
+        rrf_k: int = 60,
+        use_pool: bool = True,
+        min_size: int = 1,
+        max_size: int = 3,
+    ):
         self.dsn = dsn
         self.dimension = dimension
         self.rrf_k = rrf_k
@@ -141,12 +149,16 @@ class PgVectorHybridStore(BaseVectorStore):
         if use_pool:
             self._pool = ConnectionPool(
                 conninfo=self.dsn,
-                min_size=1,
-                max_size=10,
+                min_size=min_size,
+                max_size=max_size,
                 kwargs={"row_factory": dict_row},
                 open=True,
             )
         self._init_pgvector_schema()
+
+    def close(self) -> None:
+        if self._pool is not None:
+            self._pool.close()
 
     def _get_connection(self):
         if self._pool is not None:

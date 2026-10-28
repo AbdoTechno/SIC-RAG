@@ -1,9 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
-from api.dependencies import get_pipeline
-from pipeline.ingestion_pipeline import IngestionPipeline
-
-router = APIRouter(prefix="/documents", tags=["Documents Management"])
-
+import os
 
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, Response
 from api.dependencies import get_pipeline
@@ -23,6 +18,12 @@ async def upload_document(
     pipeline: IngestionPipeline = Depends(get_pipeline),
 ):
     raw_bytes = await file.read()
+    max_upload_mb = int(os.getenv("RAG_MAX_UPLOAD_MB", "20"))
+    if len(raw_bytes) > max_upload_mb * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"File exceeds the {max_upload_mb} MB upload limit.",
+        )
     try:
         upload_res = pipeline.upload_raw_document(
             filename=file.filename or "uploaded.txt",

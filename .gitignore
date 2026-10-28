@@ -5,5 +5,9 @@ logs/
 **/__pycache__/
 *.py[cod]
 .env
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
 __pycache__/
 *.pyc
