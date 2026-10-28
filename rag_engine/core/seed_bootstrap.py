@@ -5,7 +5,7 @@ import shutil
 import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 
 def _enabled(value: Optional[str]) -> bool:
@@ -31,15 +31,24 @@ def _has_ready_knowledge(database_path: Path) -> bool:
         return False
 
 
-def _verify_seed(seed_path: Path) -> None:
+def _seed_parts(seed_path: Path) -> List[Path]:
+    if seed_path.is_file():
+        return [seed_path]
+    return sorted(seed_path.parent.glob(f"{seed_path.name}.part-*"))
+
+
+def _copy_and_verify_seed(parts: List[Path], seed_path: Path, destination: Path) -> None:
     checksum_path = Path(f"{seed_path}.sha256")
     if not checksum_path.is_file():
         raise RuntimeError("Bundled knowledge seed checksum is missing.")
     expected = checksum_path.read_text(encoding="utf-8").strip().split()[0].lower()
     digest = hashlib.sha256()
-    with seed_path.open("rb") as source:
-        for block in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(block)
+    with destination.open("wb") as combined:
+        for part in parts:
+            with part.open("rb") as source:
+                for block in iter(lambda: source.read(1024 * 1024), b""):
+                    digest.update(block)
+                    combined.write(block)
     if digest.hexdigest() != expected:
         raise RuntimeError("Bundled knowledge seed checksum validation failed.")
 
@@ -65,13 +74,23 @@ def bootstrap_sqlite_seed(
     resolved_seed = seed_path or Path(
         os.getenv("RAG_SQLITE_SEED_PATH", "seed/pulmora_rag.db.gz")
     )
-    if not resolved_seed.is_file():
+    parts = _seed_parts(resolved_seed)
+    if not parts:
         return False
 
-    _verify_seed(resolved_seed)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_name = None
+    compressed_name = None
     try:
+        with tempfile.NamedTemporaryFile(
+            prefix="pulmora-seed-",
+            suffix=".db.gz",
+            dir=target_path.parent,
+            delete=False,
+        ) as compressed:
+            compressed_name = compressed.name
+        _copy_and_verify_seed(parts, resolved_seed, Path(compressed_name))
+
         with tempfile.NamedTemporaryFile(
             prefix="pulmora-seed-",
             suffix=".db",
@@ -79,7 +98,7 @@ def bootstrap_sqlite_seed(
             delete=False,
         ) as temporary:
             temporary_name = temporary.name
-            with gzip.open(resolved_seed, "rb") as source:
+            with gzip.open(compressed_name, "rb") as source:
                 shutil.copyfileobj(source, temporary)
 
         temporary_path = Path(temporary_name)
@@ -90,3 +109,5 @@ def bootstrap_sqlite_seed(
     finally:
         if temporary_name:
             Path(temporary_name).unlink(missing_ok=True)
+        if compressed_name:
+            Path(compressed_name).unlink(missing_ok=True)

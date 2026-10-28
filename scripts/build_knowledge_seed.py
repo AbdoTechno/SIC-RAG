@@ -12,6 +12,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--db", type=Path, default=Path("data/pulmora_rag.db"))
     parser.add_argument("--output", type=Path, default=Path("seed/pulmora_rag.db.gz"))
+    parser.add_argument("--part-size-mb", type=int, default=3)
     args = parser.parse_args()
 
     if not args.db.is_file():
@@ -36,7 +37,21 @@ def main() -> int:
 
     digest = hashlib.sha256(args.output.read_bytes()).hexdigest()
     Path(f"{args.output}.sha256").write_text(f"{digest}  {args.output.name}\n", encoding="utf-8")
-    print(f"Packaged {documents} documents, {chunks} chunks, and {vectors} vectors.")
+    for old_part in args.output.parent.glob(f"{args.output.name}.part-*"):
+        old_part.unlink()
+    part_size = args.part_size_mb * 1024 * 1024
+    if part_size <= 0:
+        raise SystemExit("part-size-mb must be positive.")
+    part_count = 0
+    with args.output.open("rb") as packaged:
+        while block := packaged.read(part_size):
+            part_count += 1
+            Path(f"{args.output}.part-{part_count:03d}").write_bytes(block)
+    args.output.unlink()
+    print(
+        f"Packaged {documents} documents, {chunks} chunks, and {vectors} vectors "
+        f"into {part_count} parts."
+    )
     return 0
 
 
