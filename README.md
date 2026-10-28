@@ -259,6 +259,7 @@ docker compose up -d
 Then use a PostgreSQL DSN and the default `postgres_store` / `pgvector_store` configuration. The database account must be allowed to create or access the `vector` extension.
 
 Use PostgreSQL for multi-instance deployments. SQLite is supported for one API process and is durable only when its database file lives on storage that survives both restarts and redeployments.
+The service creates a missing parent directory for a file-backed SQLite DSN, but the configured location must still be writable by the container user.
 
 ## BotKeep deployment
 

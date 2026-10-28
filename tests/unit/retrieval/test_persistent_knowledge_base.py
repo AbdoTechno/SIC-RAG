@@ -21,10 +21,12 @@ def _config(db_path: str):
 
 
 def test_sqlite_index_survives_restart_and_duplicate_ingestion_is_idempotent(tmp_path):
-    db_path = str(tmp_path / "rag.db")
+    database_file = tmp_path / "missing" / "nested" / "rag.db"
+    db_path = str(database_file)
     cfg = _config(db_path)
     ingest = IngestionPipeline(cfg)
     retrieval = RetrievalPipeline(cfg, ingest.store)
+    assert database_file.is_file()
     raw = b"Pleural infection assessment includes pleural fluid pH and clinical review."
     first = ingest.upload_raw_document(
         "pleural.md", raw, "Pleural Guideline", "2023", "https://example.test/pleural",

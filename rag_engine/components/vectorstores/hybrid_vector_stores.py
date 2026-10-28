@@ -12,6 +12,7 @@ from psycopg_pool import ConnectionPool
 from core.interfaces import BaseVectorStore
 from core.schemas import DocumentChunk, SourceMetadata
 from core.registry import registry
+from core.sqlite_utils import prepare_sqlite_dsn
 
 
 def _cosine_similarity(v1: List[float], v2: List[float]) -> float:
@@ -152,10 +153,10 @@ class SQLiteHybridVectorStore(BaseVectorStore):
     """Durable exact-search vector store for single-instance SQLite deployments."""
 
     def __init__(self, dsn: str, dimension: int = 384, rrf_k: int = 60):
-        self.dsn = dsn
+        self.dsn = prepare_sqlite_dsn(dsn)
         self.dimension = dimension
         self.rrf_k = rrf_k
-        self.conn = sqlite3.connect(dsn, check_same_thread=False)
+        self.conn = sqlite3.connect(self.dsn, check_same_thread=False)
         self.conn.execute("PRAGMA foreign_keys = ON;")
         self.conn.executescript(
             """

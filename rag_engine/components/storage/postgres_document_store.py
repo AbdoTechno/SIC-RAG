@@ -9,6 +9,7 @@ from psycopg_pool import ConnectionPool
 from core.interfaces import BaseDocumentStore
 from core.schemas import StoredRawFile, RawDocument, DocumentChunk, SourceMetadata
 from core.registry import registry
+from core.sqlite_utils import prepare_sqlite_dsn
 
 
 def _metadata_to_dict(meta: SourceMetadata) -> dict:
@@ -290,7 +291,7 @@ class PostgresDocumentStore(BaseDocumentStore):
 @registry.register_document_store("sqlite_store")
 class SQLiteDocumentStore(BaseDocumentStore):
     def __init__(self, dsn: str = ":memory:"):
-        self.dsn = dsn
+        self.dsn = prepare_sqlite_dsn(dsn)
         self.conn = sqlite3.connect(self.dsn, check_same_thread=False)
         self.conn.execute("PRAGMA foreign_keys = ON;")
         self._create_tables()
