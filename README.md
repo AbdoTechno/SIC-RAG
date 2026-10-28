@@ -25,6 +25,7 @@ The service does **not** inspect raw X-ray images, replace the local imaging mod
 - Stable machine-readable errors and request correlation IDs.
 - API-key protection and configurable Flutter Web CORS origins.
 - Automated corpus evaluation and restart-persistence verification.
+- Optional atomic bootstrap from the bundled, checksum-verified SQLite knowledge seed.
 
 ## Architecture
 
@@ -122,6 +123,8 @@ Start the API:
 ```bash
 python start.py
 ```
+
+With `RAG_BOOTSTRAP_SEED=true` (the default), a missing or empty SQLite database is populated from `seed/pulmora_rag.db.gz` before the API imports. A database that already contains a complete index is never overwritten.
 
 Local URLs:
 
@@ -309,6 +312,8 @@ Container-local SQLite and PDF paths must not be assumed to survive a redeploy. 
 | `RAG_LLM_TEMP` | Optional | Generation temperature |
 | `RAG_LLM_MAX_TOKENS` | Optional | Generation output limit |
 | `RAG_ENFORCE_SCOPE` | Recommended | Restrict retrieval to configured respiratory terms |
+| `RAG_BOOTSTRAP_SEED` | Optional | Install the bundled corpus into an empty SQLite database; default `true` |
+| `RAG_SQLITE_SEED_PATH` | Optional | Override the bundled seed artifact path |
 
 Never commit `.env`, API keys, database credentials, patient data, local databases, or copyrighted PDF binaries.
 
