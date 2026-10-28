@@ -142,6 +142,6 @@ Stable codes include `UNAUTHORIZED` (401), `VALIDATION_ERROR` (422), `PAYLOAD_TO
 
 ## Persistence and deployment
 
-SQLite document/chunk/vector/index-status tables share the configured database and survive an application restart when the database file itself is on persistent storage. Container-local files must not be assumed to survive a BotKeep redeploy. For deployment, either mount a BotKeep persistent volume and set `RAG_STORE_PROVIDER=sqlite_store` plus an absolute volume path in `RAG_DB_DSN`, or use PostgreSQL with `pgvector` using the existing provider configuration. Confirm the hosting storage guarantee before production ingestion.
+SQLite document/chunk/vector/index-status tables share the configured database and survive an application restart when the database file itself is on persistent storage. Container-local files must not be assumed to survive a BotKeep redeploy. For an initial single-instance deployment use `RAG_STORE_PROVIDER=sqlite_store` with the writable relative path `RAG_DB_DSN=data/pulmora_rag.db`. If BotKeep provides a persistent-volume mount, use the exact mount path supplied by the platform; never copy a placeholder such as `/absolute/persistent/path`. Otherwise use PostgreSQL with `pgvector`. Confirm the hosting storage guarantee before production ingestion.
 
 After deploying a revision, run the corpus ingestion command once against the deployed durable store, then verify `/knowledge/status`. Ingestion is deliberately not tied to server startup.

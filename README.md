@@ -286,7 +286,7 @@ The service creates a missing parent directory for a file-backed SQLite DSN, but
 6. Choose one durable storage arrangement:
 
    - PostgreSQL with `pgvector`: set `RAG_DB_DSN` and keep the default providers.
-   - Single-instance SQLite: set `RAG_STORE_PROVIDER=sqlite_store` and point `RAG_DB_DSN` to an absolute path on a confirmed persistent volume.
+   - Single-instance SQLite: start with `RAG_STORE_PROVIDER=sqlite_store` and `RAG_DB_DSN=data/pulmora_rag.db`. If BotKeep provides a persistent-volume mount, replace it with the exact writable mount path shown by BotKeep—not a documentation placeholder.
 
 7. Do not hard-code a port. BotKeep supplies `SERVER_PORT`.
 8. Deploy the code, place the reviewed PDFs on the server without committing them to Git, and run the ingestion command once against the durable store.
