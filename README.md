@@ -1,148 +1,385 @@
-# ✦ Modular RAG Engine
+# Pulmora RAG Engine
 
-> A domain-agnostic, schema-driven End-to-End Retrieval-Augmented Generation (RAG) architecture engineered on strict SOLID principles, ACID persistence, and deterministic execution.
+Evidence-grounded respiratory case review for the Pulmora Flutter application.
 
-![Python Version](https://img.shields.io/badge/python-3.11%2B-1f2937.svg?style=flat-square&logo=python&logoColor=white)
-![Architecture](https://img.shields.io/badge/architecture-SOLID%20%7C%20Plug--and--Play-0f172a.svg?style=flat-square)
-![Data Integrity](https://img.shields.io/badge/persistence-ACID%20%7C%20Idempotent-111827.svg?style=flat-square)
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.162-009688?logo=fastapi&logoColor=white)
+![Storage](https://img.shields.io/badge/Storage-SQLite%20%7C%20PostgreSQL%20%2B%20pgvector-336791)
+![Tests](https://img.shields.io/badge/Tests-26%20passing-2EA44F)
 
-The **Modular RAG Engine** is a full-lifecycle document intelligence, retrieval, and grounded generation framework. Rather than coupling system logic to specific databases, file systems, or model providers, the engine treats every stage of the RAG lifecycle—parsing, normalization, chunking, relational persistence, vector indexing, reranking, context augmentation, and LLM synthesis—as an interchangeable, contract-bound plugin orchestrated via declarative configurations.
+Pulmora RAG Engine is a FastAPI backend that receives a validated clinical snapshot, structured findings produced by the mobile app's existing local chest X-ray model, and a doctor's question. It retrieves relevant passages from reviewed respiratory references and returns a structured discussion with traceable citations.
 
----
+The service does **not** inspect raw X-ray images, replace the local imaging model, diagnose patients, or store the mobile application's visit history.
 
-## Engineering Philosophy
+## What is implemented
 
-- **Declarative Configuration & Registry Binding:** Runtime behavior is governed by `pipeline_config.yaml` and `prompts.yaml`. A Singleton Registry resolves provider keys into concrete class implementations without hard-coded dependencies.
-- **Zero-Filesystem Byte-Stream Ingestion:** Raw files are processed directly from memory streams into ACID relational storage (`BYTEA`/`BLOB`), enabling stateless container execution.
-- **Two-Tier Cryptographic Idempotency:**
-  - *Payload Deduplication:* `SHA-256` binary hashing prevents duplicate storage of identical files and dynamically maps HTTP responses (`201 Created` vs. `200 OK`).
-  - *Execution Caching:* Configuration fingerprinting (`config_hash`) caches chunking and indexing states per parameter profile, bypassing redundant compute unless explicitly overridden.
-- **Unbroken Evidence Provenance:** Immutable value objects (`SourceMetadata`) propagate document origin, version timestamps, and section headers from raw ingestion through to the final LLM citation payload.
-- **Selective Abstention Gate:** Retrieval scores are evaluated against strict confidence thresholds prior to LLM invocation, preventing hallucinated synthesis when supporting evidence is insufficient.
+- Deterministic PDF ingestion with SHA-256 deduplication and configuration-aware chunk caching.
+- SQLite or PostgreSQL document persistence.
+- Durable SQLite vector storage and PostgreSQL `pgvector` support.
+- Semantic, lexical, and hybrid retrieval with reranking and safe abstention.
+- Source provenance down to `file_id`, `chunk_id`, section, and physical PDF page.
+- Typed mobile case-review contract at `POST /rag/case-review`.
+- Generic grounded question endpoint at `POST /rag/generate`.
+- Knowledge-base readiness at `GET /knowledge/status`.
+- Structured generation through Groq with strict output and citation validation.
+- Stable machine-readable errors and request correlation IDs.
+- API-key protection and configurable Flutter Web CORS origins.
+- Automated corpus evaluation and restart-persistence verification.
 
----
+## Architecture
 
-## End-to-End System Architecture
+```mermaid
+flowchart LR
+    A[Reviewed PDFs] --> B[Validate hash and metadata]
+    B --> C[Extract and normalize]
+    C --> D[Structure-aware chunks]
+    D --> E[(Document store)]
+    D --> F[Embedding provider]
+    F --> G[(Durable vector index)]
 
-The diagram below depicts the complete system topology across three planes: **Control & Configuration**, **Write Path (Ingestion & Indexing)**, and **Read Path (Retrieval, Augmentation & Generation)**. 
-*(Legend: `●` Implemented | `◌` Active Integration)*
+    H[Flutter assessment snapshot] --> I[Focused retrieval query]
+    I --> G
+    G --> J[Hybrid retrieval and reranking]
+    J --> K{Evidence sufficient?}
+    K -- No --> L[Safe abstention]
+    K -- Yes --> M[Structured grounded generation]
+    E --> M
+    M --> N[Typed response and citations]
+```
 
+The retrieval query uses the doctor's question plus relevant symptoms, background terms, and structured imaging labels. The complete validated snapshot is supplied separately as generation context. Case data and retrieved passages are treated as untrusted content and cannot override system instructions.
 
-<img alt="FastAPI Qdrant Retrieval Evaluation Pipeline-2026-10-25-060312" src="https://github.com/user-attachments/assets/4d35b856-9ca4-4117-b0f4-6a2678a6ee32" />
+## Repository layout
 
----
+```text
+rag_engine/
+├── rag_engine/
+│   ├── api/                 FastAPI application, routers, schemas, errors
+│   ├── components/          Parsers, normalizers, chunkers, stores, generators
+│   ├── configs/             Pipeline configuration
+│   ├── core/                Interfaces, registry, shared schemas, config loader
+│   └── pipeline/            Ingestion, retrieval, and generation orchestration
+├── scripts/                 Ingestion, evaluation, and end-to-end verification
+├── evaluations/             Grounded evaluation dataset and recorded result
+├── examples/                Synthetic mobile request fixture
+├── pdfs/                    Local PDFs plus the audited metadata manifest
+├── reports/                 Ingestion and end-to-end verification reports
+├── tests/                   Unit and API tests
+├── MOBILE_INTEGRATION.md    Exact Flutter integration contract
+└── start.py                 BotKeep-compatible entry point
+```
 
-## Run locally
+PDF binaries and local database files are intentionally excluded from Git. The repository keeps only the audited manifest and corpus notes.
 
-Python 3.11 is recommended.
+## Quick start with SQLite
+
+Python 3.11 or newer is required.
 
 ```bash
 python -m venv .venv
-# Activate the environment, then:
+```
+
+Activate the environment:
+
+```bash
+# Linux/macOS
+source .venv/bin/activate
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
-docker compose up -d
+```
+
+Create `.env` from `.env.example`, then configure a single-process SQLite deployment:
+
+```env
+RAG_STORE_PROVIDER=sqlite_store
+RAG_DB_DSN=data/pulmora_rag.db
+RAG_API_KEY=replace-with-a-long-random-value
+GROQ_API_KEY=replace-with-a-groq-api-key
+RAG_ENFORCE_SCOPE=true
+```
+
+Place the reviewed PDF files in `pdfs/`. Their names and hashes must match `pdfs/sources.json`.
+
+Ingest and index the default-approved corpus:
+
+```bash
+python -m scripts.ingest_corpus \
+  --pdf-dir pdfs \
+  --manifest pdfs/sources.json \
+  --db data/pulmora_rag.db \
+  --report reports/ingestion_report.json
+```
+
+Start the API:
+
+```bash
 python start.py
 ```
 
-The API is available at `http://127.0.0.1:8000`, interactive documentation at
-`/docs`, and health status at `/health`.
+Local URLs:
 
-### Ingest the reviewed Pulmora corpus
+- API: `http://127.0.0.1:8000`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- OpenAPI: `http://127.0.0.1:8000/openapi.json`
+- Service/database health: `http://127.0.0.1:8000/health`
 
-Keep the source PDFs in `pdfs/` next to the audited `pdfs/sources.json`, then run:
+## Corpus ingestion behavior
+
+The ingestion command:
+
+1. Validates the corpus directory and manifest.
+2. Processes documents in deterministic filename order.
+3. Verifies each PDF's SHA-256 hash and physical page count.
+4. Rejects files with unusable extracted text.
+5. Registers raw bytes and verified metadata in the configured document store.
+6. Normalizes and chunks approved pages while preserving provenance.
+7. Generates embeddings and populates the active vector index.
+8. Marks a document ready only when persisted chunk and vector counts agree.
+9. Writes a per-document report and exits nonzero when a required document fails.
+
+Re-running unchanged input is idempotent: existing content is deduplicated, matching chunks are reused, and an already complete index is not rebuilt. A parser/chunker configuration change deliberately produces a new configuration fingerprint and triggers re-indexing.
+
+Optional layout-sensitive references are skipped by default. `--include-optional` should only be used after their tables, pathways, and reading order have been reviewed.
+
+## Readiness and health
+
+`GET /health` is public and reports only service/database health. It does not prove that the evidence pipeline can answer questions.
+
+Use authenticated `GET /knowledge/status` before enabling case review. It reports:
+
+- Registered document count.
+- Persisted chunk and indexed-vector counts.
+- Documents awaiting indexing or in a failed state.
+- Per-document index status and safe failure information.
+- Active embedding and vector-store configuration.
+- Whether generation credentials are configured, without calling the provider.
+- The final `retrieval_ready` decision.
+
+Case review returns `INDEX_NOT_READY` until the reference index is complete.
+
+## API overview
+
+Public routes:
+
+- `GET /`
+- `GET /health`
+- `GET /docs`
+- `GET /redoc`
+- `GET /openapi.json`
+
+Protected routes require `X-API-Key` when `RAG_API_KEY` is configured:
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/knowledge/status` | Reference and retrieval readiness |
+| `GET` | `/documents` | List documents with index status |
+| `POST` | `/documents` | Upload and optionally chunk a document |
+| `GET` | `/documents/{file_id}` | Inspect document and index counts |
+| `DELETE` | `/documents/{file_id}` | Delete document and associated vectors |
+| `POST` | `/documents/{file_id}/chunk` | Chunk or re-chunk a document |
+| `GET` | `/documents/{file_id}/chunks` | Inspect persisted chunks |
+| `POST` | `/documents/{file_id}/index` | Build or retry the document index |
+| `POST` | `/retrieval/search` | Search without generation |
+| `POST` | `/rag/generate` | Generic grounded reference question |
+| `POST` | `/rag/case-review` | Typed Pulmora assessment review |
+| `GET` | `/rag/models` | Inspect configured generation models |
+
+The generated OpenAPI document is the source of truth for field constraints and response schemas.
+
+### Generic grounded question
 
 ```bash
-python -m scripts.ingest_corpus --pdf-dir pdfs --manifest pdfs/sources.json --db data/pulmora_rag.db --report reports/ingestion_report.json
+curl -X POST http://127.0.0.1:8000/rag/generate \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $RAG_API_KEY" \
+  -d '{
+    "query": "How is hospital-acquired pneumonia defined?",
+    "top_k": 3,
+    "mode": "hybrid",
+    "file_id_filter": null
+  }'
 ```
 
-The command validates hashes and page counts, processes default-approved files in deterministic order, reuses unchanged documents/chunks/indexes, and exits nonzero if a required file fails. Optional layout-sensitive references are not indexed unless `--include-optional` is deliberately supplied. The generated report records each document's extraction, chunk, and index result.
-
-For a local persistent API using the same database, set `RAG_STORE_PROVIDER=sqlite_store` and `RAG_DB_DSN=data/pulmora_rag.db`. Authenticated `GET /knowledge/status` is the readiness source of truth. See `MOBILE_INTEGRATION.md` for the typed Flutter contract.
-
-The default deployment uses the lightweight deterministic hash embedder. To use
-the optional FastEmbed/ONNX provider on a machine with enough disk and memory,
-install the `embeddings` extra and update `pipeline_config.yaml`:
+### Mobile case review
 
 ```bash
-pip install ".[embeddings]"
+curl -X POST http://127.0.0.1:8000/rag/case-review \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $RAG_API_KEY" \
+  --data @examples/case_review_request.json
 ```
 
-Copy `.env.example` to `.env` only for local development. Never commit real credentials. For multi-instance production use PostgreSQL with the `pgvector` extension. SQLite is supported for a single process only when its database path is backed by hosting storage that survives restart and redeployment.
+The case response includes unchanged correlation fields, a case summary, evidence discussion, missing information, review points, abstention state, token usage, and actual retrieved sources. `pdf_page` is the 1-based physical PDF position, not a printed page label. Retrieval scores indicate matching relevance—not diagnostic or medical confidence.
 
-## Deploy to BotKeep
+See [MOBILE_INTEGRATION.md](MOBILE_INTEGRATION.md) for the complete Flutter mapping, request/response examples, error handling, stale-response protection, and citation semantics.
 
-1. Push this prepared revision to a GitHub repository you control.
-2. In BotKeep, create a Python application from that repository and select the
-   repository root (the directory containing `requirements.txt`).
-3. Select Python 3.11 and use this start command:
+## Error contract
+
+Errors retain `detail` for backward compatibility and provide a stable typed body:
+
+```json
+{
+  "detail": "Reference documents are not fully indexed.",
+  "error": {
+    "code": "INDEX_NOT_READY",
+    "message": "Reference documents are not fully indexed.",
+    "request_id": "client-or-server-request-id",
+    "retryable": true
+  }
+}
+```
+
+Important codes include:
+
+- `UNAUTHORIZED`
+- `VALIDATION_ERROR`
+- `PAYLOAD_TOO_LARGE`
+- `KNOWLEDGE_BASE_EMPTY`
+- `INDEX_NOT_READY`
+- `GENERATION_UNAVAILABLE`
+- `INVALID_MODEL_RESPONSE`
+
+Clients may supply `X-Request-ID`; it is returned in the response header and typed error body.
+
+## PostgreSQL and pgvector
+
+For PostgreSQL development, start the included service:
+
+```bash
+docker compose up -d
+```
+
+Then use a PostgreSQL DSN and the default `postgres_store` / `pgvector_store` configuration. The database account must be allowed to create or access the `vector` extension.
+
+Use PostgreSQL for multi-instance deployments. SQLite is supported for one API process and is durable only when its database file lives on storage that survives both restarts and redeployments.
+
+## BotKeep deployment
+
+1. Create or update the BotKeep Python application from this repository.
+2. Select Python 3.11.
+3. Use the repository root containing `requirements.txt`.
+4. Set the startup command to:
 
    ```text
    python start.py
    ```
 
-4. Add the following in BotKeep Environment/Secrets:
+5. Configure secrets/environment variables:
 
-   - `RAG_DB_DSN`: PostgreSQL connection URL with `pgvector`, or a persistent absolute SQLite path when `RAG_STORE_PROVIDER=sqlite_store`.
-   - `GROQ_API_KEY`: Groq secret key used for answer generation.
-   - `RAG_API_KEY`: a long random shared key required in `X-API-Key`.
-   - `RAG_CORS_ORIGINS`: comma-separated Flutter Web origins. It is not needed
-     for Android/iOS clients.
-   - `RAG_DB_POOL_MAX=3`: conservative connection limit for a small instance.
-   - `RAG_MAX_UPLOAD_MB=20`: maximum accepted document size.
-
-   BotKeep supplies `SERVER_PORT`; do not hard-code it in the panel or source.
-
-5. Enable HTTPS routing in **Domains**, then verify:
-
-   ```text
-   GET https://YOUR_DOMAIN/health
-   GET https://YOUR_DOMAIN/docs
+   ```env
+   RAG_API_KEY=<long-random-secret>
+   GROQ_API_KEY=<groq-secret>
+   RAG_ENFORCE_SCOPE=true
+   RAG_MAX_UPLOAD_MB=20
+   RAG_LLM_TEMP=0.1
+   RAG_LLM_MAX_TOKENS=1024
    ```
 
-BotKeep databases consume a separate workload slot. If the account has only one slot, use an external PostgreSQL provider that supports `pgvector`, or a confirmed persistent volume for the single-process SQLite store. In-memory storage is test-only. A SQLite path inside an ephemeral container is not redeploy-safe.
+6. Choose one durable storage arrangement:
 
-## API contract
+   - PostgreSQL with `pgvector`: set `RAG_DB_DSN` and keep the default providers.
+   - Single-instance SQLite: set `RAG_STORE_PROVIDER=sqlite_store` and point `RAG_DB_DSN` to an absolute path on a confirmed persistent volume.
 
-All non-public routes require the `X-API-Key` header when `RAG_API_KEY` is set.
-Public routes are `/`, `/health`, `/docs`, `/redoc`, and `/openapi.json`.
+7. Do not hard-code a port. BotKeep supplies `SERVER_PORT`.
+8. Deploy the code, place the reviewed PDFs on the server without committing them to Git, and run the ingestion command once against the durable store.
+9. Verify `/health`, then authenticated `/knowledge/status`, then a synthetic `/rag/case-review` request.
 
-Typical application flow:
+Container-local SQLite and PDF paths must not be assumed to survive a redeploy. A successful `/health` response alone is not deployment verification.
 
-1. `POST /documents` as `multipart/form-data` with `file`, `source_name`, and
-   optional `version_date`, `source_link`, and `auto_chunk`.
-2. `POST /documents/{file_id}/index` after upload/chunking.
-3. `POST /rag/generate` with JSON such as:
+## Configuration
 
-   ```json
-   {
-     "query": "What does the uploaded guideline say?",
-     "top_k": 3,
-     "mode": "hybrid",
-     "file_id_filter": null
-   }
-   ```
+| Variable | Required | Description |
+| --- | --- | --- |
+| `RAG_API_KEY` | Production | Shared prototype API key for protected routes |
+| `GROQ_API_KEY` | Generation | Groq credential; never expose it to Flutter |
+| `RAG_DB_DSN` | Yes | PostgreSQL connection string or SQLite file path |
+| `RAG_STORE_PROVIDER` | SQLite only | Set to `sqlite_store` for SQLite deployments |
+| `RAG_CORS_ORIGINS` | Flutter Web | Comma-separated explicit origins |
+| `RAG_DB_POOL_MAX` | PostgreSQL | Maximum connection-pool size |
+| `RAG_MAX_UPLOAD_MB` | Optional | Upload limit; default is 20 MB |
+| `RAG_LLM_MODEL` | Optional | Preferred Groq model |
+| `RAG_LLM_TEMP` | Optional | Generation temperature |
+| `RAG_LLM_MAX_TOKENS` | Optional | Generation output limit |
+| `RAG_ENFORCE_SCOPE` | Recommended | Restrict retrieval to configured respiratory terms |
 
-4. Display `answer`, `abstained`, and `sources_cited` from the response.
+Never commit `.env`, API keys, database credentials, patient data, local databases, or copyrighted PDF binaries.
 
-Other useful routes include `GET /documents`, `GET /documents/{file_id}`,
-`DELETE /documents/{file_id}`, `GET /documents/{file_id}/chunks`,
-`POST /retrieval/search`, and `GET /rag/models`. The generated OpenAPI contract
-at `/openapi.json` is the source of truth for request and response schemas.
+## Verification
 
-## Production notes
-
-- Keep `GROQ_API_KEY`, `RAG_DB_DSN`, and `RAG_API_KEY` only in BotKeep Secrets.
-- `RAG_API_KEY` is basic shared-secret protection. A key embedded in a mobile
-  binary can be extracted; use user authentication or a trusted backend proxy
-  before handling private or per-user data.
-- The service intentionally runs one Uvicorn process because the in-process
-  pipelines and small BotKeep resource profile do not benefit from extra workers.
-- Monitor `/health`, application logs, database connection usage, and Groq quota.
-
-## Tests
+Install development dependencies with `uv`:
 
 ```bash
 uv sync --dev
-uv run pytest -q
 ```
 
+Or with `pip`:
+
+```bash
+pip install -r requirements.txt pytest pytest-cov httpx
+```
+
+Run the automated test suite:
+
+```bash
+python -m pytest -q
+```
+
+Evaluate retrieval against the inspected corpus:
+
+```bash
+python -m scripts.evaluate_corpus \
+  --db data/pulmora_rag.db \
+  --dataset evaluations/datasets/pulmora_corpus_eval_v1.json \
+  --report evaluations/history/pulmora_corpus_eval_report_v1.json
+```
+
+Verify persisted retrieval and a synthetic mobile request after reopening the database:
+
+```bash
+python -m scripts.verify_e2e \
+  --db data/pulmora_rag.db \
+  --fixture examples/case_review_request.json \
+  --report reports/e2e_verification.json
+```
+
+Latest recorded local engineering result:
+
+- 26 automated tests passed.
+- 7 of 7 corpus retrieval checks passed.
+- 3 default-approved references ready.
+- 1,334 persisted chunks and 1,334 indexed vectors.
+- Retrieval succeeded after database reopen.
+- Synthetic case correlation and PDF-page citations were verified.
+
+These checks validate the software pipeline, not the clinical correctness of recommendations. Clinical evaluation requires qualified reviewers.
+
+## Supporting documentation
+
+- [Flutter integration contract](MOBILE_INTEGRATION.md)
+- [Synthetic case request](examples/case_review_request.json)
+- [Corpus metadata manifest](pdfs/sources.json)
+- [Arabic corpus notes](pdfs/README_AR.md)
+- [Ingestion report](reports/ingestion_report.json)
+- [Retrieval evaluation report](evaluations/history/pulmora_corpus_eval_report_v1.json)
+- [End-to-end verification report](reports/e2e_verification.json)
+
+## Security and clinical boundaries
+
+- The mobile assessment ID is a correlation identifier, not proof of authorization.
+- A shared API key embedded in a public mobile binary can be extracted. Replace it with real user authentication or a trusted backend proxy before public production use.
+- Do not send patient names, phone numbers, dates of birth, or raw X-ray images to the case-review endpoint.
+- Imaging labels remain model-generated findings and are not confirmed diagnoses.
+- Uncalibrated scores are not interpreted as disease probabilities.
+- The service abstains when the indexed corpus does not support a question.
+- Reference licensing and redistribution rights must be reviewed before production ingestion.
+
+## License
+
+No project license is currently declared. Medical reference documents remain the property of their respective publishers and are not redistributed through this repository.
