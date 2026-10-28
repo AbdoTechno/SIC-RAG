@@ -32,6 +32,14 @@ def _text_pdf_bytes(text: str) -> bytes:
     return output.getvalue()
 
 
+def _blank_pdf_bytes() -> bytes:
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    output = BytesIO()
+    writer.write(output)
+    return output.getvalue()
+
+
 def test_lightweight_pdf_parser_extracts_text_and_page_metadata():
     parser = registry.get_parser(".pdf")()
 
@@ -46,3 +54,25 @@ def test_lightweight_pdf_parser_extracts_text_and_page_metadata():
     assert documents[0].file_id == "pdf-file-1"
     assert documents[0].metadata.page_or_section == "Page 1"
     assert documents[0].metadata.extra["page_number"] == 1
+
+
+def test_pdf_parser_rejects_image_only_or_empty_text_pdf():
+    parser = registry.get_parser(".pdf")()
+    try:
+        parser.parse(_blank_pdf_bytes(), {"source_name": "Scanned Reference"}, "scan-1")
+        assert False, "blank/image-only PDFs must not be silently accepted"
+    except ValueError as exc:
+        assert "no extractable textual content" in str(exc)
+
+
+def test_pdf_parser_honors_reviewed_physical_page_exclusions():
+    parser = registry.get_parser(".pdf")()
+    try:
+        parser.parse(
+            _text_pdf_bytes("Unsafe decision path"),
+            {"source_name": "Pathway", "extra": {"exclude_pdf_pages": [1]}},
+            "pathway-1",
+        )
+        assert False, "a document with no approved textual pages must fail"
+    except ValueError as exc:
+        assert "no extractable textual content" in str(exc)

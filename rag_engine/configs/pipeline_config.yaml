@@ -39,6 +39,30 @@ ingestion:
 
 retrieval:
   abstention_threshold: 0.2
+  enforce_scope: true
+  scope_terms:
+    - pneumonia
+    - pneumothorax
+    - pleural
+    - effusion
+    - aspiration
+    - respiratory
+    - lung
+    - chest
+    - dyspnea
+    - breath
+    - cough
+    - hypoxia
+    - cxr
+    - cap
+    - hap
+    - vap
+    - الالتهاب
+    - رئوي
+    - بلوري
+    - جنبي
+    - صدر
+    - تنفس
   embedder:
     name: "hash_embedder"
     params:

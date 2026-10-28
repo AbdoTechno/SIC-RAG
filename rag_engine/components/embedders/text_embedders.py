@@ -8,6 +8,16 @@ from core.registry import registry
 
 @registry.register_embedder("hash_embedder")
 class DeterministicHashEmbedder(BaseEmbedder):
+    ARABIC_QUERY_EXPANSIONS = {
+        "الالتهاب الرئوي المكتسب من المستشفى": "hospital acquired pneumonia",
+        "التهاب رئوي مكتسب من المستشفى": "hospital acquired pneumonia",
+        "الالتهاب الرئوي": "pneumonia",
+        "الارتشاح البلوري": "pleural effusion",
+        "الانصباب الجنبي": "pleural effusion",
+        "استرواح الصدر": "pneumothorax",
+        "الالتهاب الرئوي بالشفط": "aspiration pneumonia",
+        "تعريف": "definition defined",
+    }
     def __init__(self, dim: int = 384):
         self._dim = dim
 
@@ -35,8 +45,17 @@ class DeterministicHashEmbedder(BaseEmbedder):
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         return [self._embed_single(t) for t in texts]
 
+    def expand_query(self, query: str) -> str:
+        expanded = query
+        for arabic, english in self.ARABIC_QUERY_EXPANSIONS.items():
+            if arabic in query:
+                expanded += f" {english}"
+        if "aspiration pneumonia" in expanded.lower():
+            expanded += " AP"
+        return expanded
+
     def embed_query(self, query: str) -> List[float]:
-        return self._embed_single(query)
+        return self._embed_single(self.expand_query(query))
 
 
 @registry.register_embedder("fastembed_embedder")

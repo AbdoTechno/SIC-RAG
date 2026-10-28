@@ -90,7 +90,14 @@ class PDFStreamParser(BaseFileParser):
                 except Exception as exc:
                     raise ValueError("Encrypted PDF files are not supported.") from exc
 
+            excluded_pages = {
+                int(number)
+                for number in base_metadata.get("extra", {}).get("exclude_pdf_pages", [])
+            }
             for page_idx, page in enumerate(reader.pages):
+                physical_page = page_idx + 1
+                if physical_page in excluded_pages:
+                    continue
                 page_text = (page.extract_text() or "").strip().replace("\x00", "")
                 if not page_text:
                     continue
@@ -100,8 +107,13 @@ class PDFStreamParser(BaseFileParser):
                     version_date=str(base_metadata.get("version_date", "N/A")),
                     source_link=base_metadata.get("source_link", "postgres://raw_files"),
                     file_format="pdf",
-                    page_or_section=f"Page {page_idx + 1}",
-                    extra={**base_metadata.get("extra", {}), "page_number": page_idx + 1},
+                    page_or_section=f"Page {physical_page}",
+                    extra={
+                        **base_metadata.get("extra", {}),
+                        "page_number": physical_page,
+                        "pdf_page": physical_page,
+                        "pdf_page_convention": "1-based physical PDF page",
+                    },
                 )
                 raw_docs.append(
                     RawDocument(

@@ -128,8 +128,9 @@ class PostgresDocumentStore(BaseDocumentStore):
                     """
                     INSERT INTO raw_files (file_id, filename, file_format, content_hash, raw_bytes, metadata)
                     VALUES (%s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (content_hash) DO UPDATE 
-                    SET content_hash = EXCLUDED.content_hash
+                    ON CONFLICT (content_hash) DO UPDATE
+                    SET filename = EXCLUDED.filename,
+                        metadata = EXCLUDED.metadata
                     RETURNING file_id;
                     """,
                     (
@@ -346,6 +347,15 @@ class SQLiteDocumentStore(BaseDocumentStore):
         cur.execute("SELECT file_id FROM raw_files WHERE content_hash = ?", (raw_file.content_hash,))
         existing = cur.fetchone()
         if existing:
+            cur.execute(
+                "UPDATE raw_files SET filename = ?, metadata = ? WHERE file_id = ?",
+                (
+                    raw_file.filename,
+                    json.dumps(_metadata_to_dict(raw_file.metadata)),
+                    existing[0],
+                ),
+            )
+            self.conn.commit()
             return existing[0]
 
         cur.execute(
@@ -477,4 +487,4 @@ class SQLiteDocumentStore(BaseDocumentStore):
             )
             for r in cur.fetchall()
         ]
-    
+

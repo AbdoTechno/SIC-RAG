@@ -1,0 +1,62 @@
+{
+  "request_id": "flutter-2026-10-28-0001",
+  "assessment_id": "assessment-opaque-7d55",
+  "input_revision": 1,
+  "question": "Which reference evidence is relevant to this assessment?",
+  "clinical_context": {
+    "age_years": 58,
+    "sex": "male",
+    "chief_complaint": "Shortness of breath",
+    "symptoms": [
+      {
+        "name": "dyspnea",
+        "duration": "3 days"
+      },
+      {
+        "name": "cough",
+        "duration": "4 days"
+      }
+    ],
+    "chronic_conditions": {
+      "status": "unknown",
+      "items": []
+    },
+    "allergies": {
+      "status": "none",
+      "items": []
+    },
+    "medications": {
+      "status": "unknown",
+      "items": []
+    },
+    "vitals": [
+      {
+        "name": "oxygen_saturation",
+        "value": 91,
+        "unit": "%",
+        "recorded_at": "2026-10-28T09:15:00+02:00"
+      }
+    ],
+    "other_tests": [],
+    "doctor_notes": "Synthetic integration fixture; contains no real patient data."
+  },
+  "imaging_findings": {
+    "origin": "local_model",
+    "model_name": "pulmora-local-cxr",
+    "model_version": "integration-fixture",
+    "findings": [
+      {
+        "label": "pleural effusion",
+        "score": 0.82,
+        "score_kind": "confidence",
+        "calibrated": false
+      }
+    ],
+    "warnings": [
+      "Synthetic label for contract testing only."
+    ]
+  },
+  "top_k": 3,
+  "mode": "hybrid",
+  "file_id_filter": null
+}

@@ -1,16 +1,18 @@
 import os
 import secrets
+import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
-import yaml
-from typing import Dict, Any, Optional
+from typing import Optional
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pipeline.ingestion_pipeline import IngestionPipeline
 from pipeline.retrieval_pipeline import RetrievalPipeline
 from pipeline.rag_pipeline import EndToEndRAGPipeline
+from core.config import load_default_config
+from api.errors import APIError, error_body
 
 from api.routers import (
     health_router,
@@ -18,57 +20,10 @@ from api.routers import (
     chunks_router,
     retrieval_router,
     generation_router,
+    knowledge_router,
 )
 
 load_dotenv()
-
-
-def load_default_config() -> Dict[str, Any]:
-    config_path = Path(__file__).resolve().parent.parent / "configs" / "pipeline_config.yaml"
-    with open(config_path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-
-    # Database Overrides
-    env_provider = os.getenv("RAG_STORE_PROVIDER")
-    env_dsn = os.getenv("RAG_DB_DSN")
-    if env_provider:
-        cfg["document_store"]["provider"] = env_provider
-        if env_provider == "sqlite_store":
-            cfg["document_store"]["params"] = {"dsn": env_dsn or ":memory:"}
-            cfg.setdefault("retrieval", {})["vector_store"] = {
-                "provider": "in_memory_vector_store",
-                "params": {},
-            }
-    if env_dsn and env_provider != "sqlite_store":
-        cfg["document_store"]["params"]["dsn"] = env_dsn
-        if cfg.get("retrieval", {}).get("vector_store", {}).get("provider") == "pgvector_store":
-            cfg["retrieval"]["vector_store"]["params"]["dsn"] = env_dsn
-
-    env_pool_max = os.getenv("RAG_DB_POOL_MAX")
-    if env_pool_max and cfg["document_store"]["provider"] == "postgres_store":
-        pool_max = int(env_pool_max)
-        if pool_max < 1:
-            raise ValueError("RAG_DB_POOL_MAX must be at least 1.")
-        cfg["document_store"]["params"]["max_size"] = pool_max
-        vector_params = cfg.get("retrieval", {}).get("vector_store", {}).get("params", {})
-        if vector_params:
-            vector_params["max_size"] = pool_max
-            
-    # SWE Fix: LLM Generation Overrides via Environment Variables
-    env_llm_model = os.getenv("RAG_LLM_MODEL")
-    env_llm_temp = os.getenv("RAG_LLM_TEMP")
-    env_llm_tokens = os.getenv("RAG_LLM_MAX_TOKENS")
-    
-    if env_llm_model or env_llm_temp or env_llm_tokens:
-        gen_params = cfg.setdefault("generation", {}).setdefault("params", {})
-        if env_llm_model:
-            gen_params["model_name"] = env_llm_model
-        if env_llm_temp:
-            gen_params["temperature"] = float(env_llm_temp)
-        if env_llm_tokens:
-            gen_params["max_tokens"] = int(env_llm_tokens)
-
-    return cfg
 
 
 def create_app(
@@ -90,7 +45,7 @@ def create_app(
 
     app = FastAPI(
         title="Enterprise RAG Engine - End-to-End API",
-        version="3.0.0",
+        version="3.1.0",
         description="Modular REST API for ingestion, hybrid retrieval, quantitative evaluation, and LLM generation.",
         lifespan=lifespan,
     )
@@ -124,6 +79,8 @@ def create_app(
 
     @app.middleware("http")
     async def require_api_key(request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", "").strip()[:128] or str(uuid.uuid4())
+        request.state.request_id = request_id
         public_paths = {"/", "/health", "/docs", "/openapi.json", "/redoc"}
         if (
             api_key
@@ -131,8 +88,46 @@ def create_app(
             and request.url.path not in public_paths
             and not secrets.compare_digest(request.headers.get("X-API-Key", ""), api_key)
         ):
-            return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key."})
-        return await call_next(request)
+            return JSONResponse(
+                status_code=401,
+                content=error_body("UNAUTHORIZED", "Invalid or missing API key.", request_id),
+                headers={"X-Request-ID": request_id},
+            )
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+    @app.exception_handler(APIError)
+    async def handle_api_error(request: Request, exc: APIError):
+        request_id = exc.request_id or getattr(request.state, "request_id", str(uuid.uuid4()))
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=error_body(exc.code, exc.message, request_id, exc.retryable),
+            headers={"X-Request-ID": request_id},
+        )
+
+    @app.exception_handler(HTTPException)
+    async def handle_http_error(request: Request, exc: HTTPException):
+        request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+        message = str(exc.detail)
+        codes = {400: "INVALID_OPERATION", 404: "NOT_FOUND", 413: "PAYLOAD_TOO_LARGE", 503: "DEPENDENCY_UNAVAILABLE"}
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=error_body(codes.get(exc.status_code, "HTTP_ERROR"), message, request_id, exc.status_code >= 500),
+            headers={"X-Request-ID": request_id},
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_validation_error(request: Request, exc: RequestValidationError):
+        request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+        return JSONResponse(
+            status_code=422,
+            content={
+                **error_body("VALIDATION_ERROR", "Request validation failed.", request_id),
+                "validation_errors": exc.errors(),
+            },
+            headers={"X-Request-ID": request_id},
+        )
 
     app.state.pipeline = active_ingest
     app.state.retrieval_pipeline = active_retrieval
@@ -153,6 +148,7 @@ def create_app(
     app.include_router(chunks_router.router)
     app.include_router(retrieval_router.router)
     app.include_router(generation_router.router)
+    app.include_router(knowledge_router.router)
 
     return app
 

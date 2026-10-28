@@ -11,3 +11,12 @@ logs/
 htmlcov/
 __pycache__/
 *.pyc
+
+# Local durable runtime data and inspection artifacts
+data/*.db
+data/*.db-*
+tmp/
+
+# Reference binaries stay local because redistribution rights are not asserted.
+# Keep the audited manifest and notes in Git.
+pdfs/*.pdf

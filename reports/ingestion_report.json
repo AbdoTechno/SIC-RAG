@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-28T20:48:59.398455+00:00",
+  "database": "data\\pulmora_rag.db",
+  "page_number_convention": "1-based physical PDF page",
+  "include_optional": false,
+  "summary": {
+    "ready": 3,
+    "skipped": 6,
+    "failed": 0
+  },
+  "documents": [
+    {
+      "filename": "BTS_Aspiration_Pneumonia_Statement_2023.pdf",
+      "status": "ready",
+      "warnings": [],
+      "errors": [],
+      "file_id": "71d78afd-d24f-426f-8ef8-0dd4d08df219",
+      "content_hash": "cf59b2f5d1838d4f2ff33c131053836dc17394aaad4598121427d6bbcddde767",
+      "deduplicated": true,
+      "pages_extracted": 19,
+      "pages_indexed": 19,
+      "excluded_pdf_pages": [],
+      "page_count": 19,
+      "chunks_created": 467,
+      "chunk_status": "cached_skip",
+      "index_status": "already_indexed",
+      "indexed_chunks": 467
+    },
+    {
+      "filename": "BTS_Pleural_Clinical_Pathways_2023.pdf",
+      "status": "skipped",
+      "warnings": [],
+      "errors": [],
+      "reason": "ingest_default=false; requires layout/scope review"
+    },
+    {
+      "filename": "BTS_Pleural_Disease_Guideline_2023.pdf",
+      "status": "ready",
+      "warnings": [
+        "Sparse pages excluded after visual review: [39]"
+      ],
+      "errors": [],
+      "file_id": "dd1634f8-4780-4b89-9bd6-4593f1ed51c7",
+      "content_hash": "58c90bd65c4299fd7664caaa0bc0face60319ff7e00cef385c33240ef028ac20",
+      "deduplicated": true,
+      "pages_extracted": 42,
+      "pages_indexed": 35,
+      "excluded_pdf_pages": [
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "page_count": 42,
+      "chunks_created": 564,
+      "chunk_status": "cached_skip",
+      "index_status": "already_indexed",
+      "indexed_chunks": 564
+    },
+    {
+      "filename": "BTS_Pleural_Procedures_Statement_2023.pdf",
+      "status": "skipped",
+      "warnings": [],
+      "errors": [],
+      "reason": "ingest_default=false; requires layout/scope review"
+    },
+    {
+      "filename": "NICE_CAP_Adults_Hospital_2025.pdf",
+      "status": "skipped",
+      "warnings": [],
+      "errors": [],
+      "reason": "ingest_default=false; requires layout/scope review"
+    },
+    {
+      "filename": "NICE_CAP_Adults_Primary_Care_2025.pdf",
+      "status": "skipped",
+      "warnings": [],
+      "errors": [],
+      "reason": "ingest_default=false; requires layout/scope review"
+    },
+    {
+      "filename": "NICE_Hospital_Acquired_Pneumonia_2025.pdf",
+      "status": "skipped",
+      "warnings": [],
+      "errors": [],
+      "reason": "ingest_default=false; requires layout/scope review"
+    },
+    {
+      "filename": "NICE_Pneumonia_NG250_2025_updated_2026.pdf",
+      "status": "ready",
+      "warnings": [],
+      "errors": [],
+      "file_id": "6a377c66-3dd0-408f-8f88-5b1e8ea78308",
+      "content_hash": "3d79412fb9bfe8ab8f9ca112d7d6ada4d224f145366b7854123a903cd14ae5bf",
+      "deduplicated": true,
+      "pages_extracted": 61,
+      "pages_indexed": 61,
+      "excluded_pdf_pages": [],
+      "page_count": 61,
+      "chunks_created": 303,
+      "chunk_status": "cached_skip",
+      "index_status": "already_indexed",
+      "indexed_chunks": 303
+    },
+    {
+      "filename": "Stanford_Inpatient_Pneumonia.pdf",
+      "status": "skipped",
+      "warnings": [],
+      "errors": [],
+      "reason": "ingest_default=false; requires layout/scope review"
+    }
+  ]
+}

@@ -14,6 +14,8 @@ import components.chunkers
 
 # Facade & Template Method - coordinates Storage, Parsing, Normalization, and Idempotent Chunking
 class IngestionPipeline:
+    CHUNKING_PIPELINE_VERSION = "2026-10-28.3"
+
     def __init__(self, config: Dict[str, Any], store: Optional[BaseDocumentStore] = None):
         self.config = config
         if store is not None:
@@ -23,9 +25,19 @@ class IngestionPipeline:
             store_cls = registry.get_document_store(store_cfg["provider"])
             self.store = store_cls(**store_cfg.get("params", {}))
 
-    def _compute_config_hash(self, normalizers_cfg: List[Dict[str, Any]], chunker_cfg: Dict[str, Any]) -> str:
+    def _compute_config_hash(
+        self,
+        normalizers_cfg: List[Dict[str, Any]],
+        chunker_cfg: Dict[str, Any],
+        parser_options: Optional[Dict[str, Any]] = None,
+    ) -> str:
         payload = json.dumps(
-            {"normalizers": normalizers_cfg, "chunker": chunker_cfg},
+            {
+                "normalizers": normalizers_cfg,
+                "chunker": chunker_cfg,
+                "parser_options": parser_options or {},
+                "pipeline_version": self.CHUNKING_PIPELINE_VERSION,
+            },
             sort_keys=True,
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
@@ -89,7 +101,10 @@ class IngestionPipeline:
         norm_cfg = normalizers_override if normalizers_override is not None else ingestion_cfg.get("normalizers", [])
         chunk_cfg = chunker_override if chunker_override is not None else ingestion_cfg.get("chunker", {"name": "recursive_chunker", "params": {}})
 
-        config_hash = self._compute_config_hash(norm_cfg, chunk_cfg)
+        parser_options = {
+            "exclude_pdf_pages": stored_file.metadata.extra.get("exclude_pdf_pages", []),
+        }
+        config_hash = self._compute_config_hash(norm_cfg, chunk_cfg, parser_options)
 
         # idempotency Guard - Skip heavy parsing/chunking if exact config was already executed.
         if not force_rechunk:

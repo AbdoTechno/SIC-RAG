@@ -1,8 +1,9 @@
 import os
 
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, Response
-from api.dependencies import get_pipeline
+from api.dependencies import get_pipeline, get_retrieval_pipeline
 from pipeline.ingestion_pipeline import IngestionPipeline
+from pipeline.retrieval_pipeline import RetrievalPipeline
 
 router = APIRouter(prefix="/documents", tags=["Documents Management"])
 
@@ -16,6 +17,7 @@ async def upload_document(
     source_link: str = Form("db://raw_files"),
     auto_chunk: bool = Form(True),
     pipeline: IngestionPipeline = Depends(get_pipeline),
+    retrieval_pipeline: RetrievalPipeline = Depends(get_retrieval_pipeline),
 ):
     raw_bytes = await file.read()
     max_upload_mb = int(os.getenv("RAG_MAX_UPLOAD_MB", "20"))
@@ -42,6 +44,8 @@ async def upload_document(
         chunk_info = None
         if auto_chunk:
             chunk_res = pipeline.run_chunking_for_file(upload_res["file_id"], force_rechunk=False)
+            if chunk_res["status"] == "newly_chunked":
+                retrieval_pipeline.invalidate_file_index(upload_res["file_id"])
             chunk_info = {
                 "chunking_status": chunk_res["status"],
                 "config_hash": chunk_res["config_hash"],
@@ -53,12 +57,32 @@ async def upload_document(
 
 
 @router.get("", status_code=status.HTTP_200_OK)
-def list_documents(pipeline: IngestionPipeline = Depends(get_pipeline)):
-    return {"documents": pipeline.store.list_raw_files()}
+def list_documents(
+    pipeline: IngestionPipeline = Depends(get_pipeline),
+    retrieval_pipeline: RetrievalPipeline = Depends(get_retrieval_pipeline),
+):
+    index_by_id = {
+        item["file_id"]: item
+        for item in retrieval_pipeline.knowledge_status()["documents"]
+    }
+    documents = []
+    for document in pipeline.store.list_raw_files():
+        index = index_by_id.get(document["file_id"], {})
+        documents.append({
+            **document,
+            "indexed_chunk_count": index.get("indexed_chunk_count", 0),
+            "index_status": index.get("index_status", "awaiting_index"),
+            "index_error": index.get("error"),
+        })
+    return {"documents": documents}
 
 
 @router.get("/{file_id}", status_code=status.HTTP_200_OK)
-def get_document_details(file_id: str, pipeline: IngestionPipeline = Depends(get_pipeline)):
+def get_document_details(
+    file_id: str,
+    pipeline: IngestionPipeline = Depends(get_pipeline),
+    retrieval_pipeline: RetrievalPipeline = Depends(get_retrieval_pipeline),
+):
     raw_file = pipeline.store.get_raw_file(file_id)
     if not raw_file:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Document '{file_id}' not found.")
@@ -75,11 +99,27 @@ def get_document_details(file_id: str, pipeline: IngestionPipeline = Depends(get
         "metadata": raw_file.metadata,
         "parsed_documents_count": len(parsed_docs),
         "chunks_count": len(chunks),
+        "indexed_chunks_count": retrieval_pipeline.vector_store.count_vectors(file_id),
+        "index_status": next(
+            (
+                item["index_status"]
+                for item in retrieval_pipeline.knowledge_status()["documents"]
+                if item["file_id"] == file_id
+            ),
+            "awaiting_index",
+        ),
     }
 
 
 @router.delete("/{file_id}", status_code=status.HTTP_200_OK)
-def delete_document(file_id: str, pipeline: IngestionPipeline = Depends(get_pipeline)):
+def delete_document(
+    file_id: str,
+    pipeline: IngestionPipeline = Depends(get_pipeline),
+    retrieval_pipeline: RetrievalPipeline = Depends(get_retrieval_pipeline),
+):
+    if not pipeline.store.get_raw_file(file_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Document '{file_id}' not found.")
+    retrieval_pipeline.vector_store.delete_by_file_id(file_id)
     deleted = pipeline.store.delete_file(file_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Document '{file_id}' not found.")

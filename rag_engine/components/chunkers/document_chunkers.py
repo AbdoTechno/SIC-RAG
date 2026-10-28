@@ -139,7 +139,10 @@ class MarkdownSectionChunker(BaseChunker):
                     doc_id=document.doc_id,
                     file_id=document.file_id,
                     content=intro_text,
-                    metadata=replace(document.metadata, page_or_section="Introduction"),
+                    metadata=replace(
+                        document.metadata,
+                        page_or_section=f"{document.metadata.page_or_section or 'Document'} | Introduction",
+                    ),
                 )
                 for c in self.inner_chunker.chunk(intro_doc):
                     c.chunk_index = chunk_counter
@@ -155,7 +158,7 @@ class MarkdownSectionChunker(BaseChunker):
 
             section_meta = replace(
                 document.metadata,
-                page_or_section=section_title,
+                page_or_section=f"{document.metadata.page_or_section or 'Document'} | {section_title}",
             )
             section_doc = RawDocument(
                 doc_id=document.doc_id,

@@ -1,0 +1,25 @@
+{
+  "created_at": "2026-10-28T20:49:26.520010+00:00",
+  "passed": true,
+  "generation_mode": "extractive_mock_generator",
+  "restart_retrieval_passed": true,
+  "knowledge": {
+    "retrieval_ready": true,
+    "registered_document_count": 3,
+    "parsed_chunk_count": 1334,
+    "indexed_chunk_count": 1334
+  },
+  "case": {
+    "http_status": 200,
+    "correlations_passed": true,
+    "abstained": false,
+    "citations_resolve": true,
+    "source_count": 3,
+    "source_pages": [
+      2,
+      5,
+      13
+    ]
+  },
+  "note": "Automated engineering verification with a deterministic mock generator; not clinical validation."
+}

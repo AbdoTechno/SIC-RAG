@@ -1,0 +1,196 @@
+{
+  "created_at": "2026-10-28T20:49:15.606900+00:00",
+  "dataset": "evaluations\\datasets\\pulmora_corpus_eval_v1.json",
+  "total": 7,
+  "passed": 7,
+  "pass_rate": 1.0,
+  "results": [
+    {
+      "id": "hap-definition-direct",
+      "type": "direct_reference",
+      "passed": true,
+      "abstained": false,
+      "abstention_reason": null,
+      "max_score": 0.5995,
+      "source_match": true,
+      "page_match": true,
+      "term_match": true,
+      "top_results": [
+        {
+          "source_name": "Pneumonia: diagnosis and management (NG250)",
+          "section": "Page 41 | Part 4",
+          "pdf_page": 41,
+          "chunk_id": "cc7763bd-1a1d-4af9-bff3-56eaecda9002_chk_3_bb8eb7e7",
+          "rerank_score": 0.5995
+        },
+        {
+          "source_name": "Pneumonia: diagnosis and management (NG250)",
+          "section": "Page 41 | Part 1",
+          "pdf_page": 41,
+          "chunk_id": "cc7763bd-1a1d-4af9-bff3-56eaecda9002_chk_0_b4f23049",
+          "rerank_score": 0.5575
+        }
+      ]
+    },
+    {
+      "id": "aspiration-community-paraphrase",
+      "type": "paraphrased_reference",
+      "passed": true,
+      "abstained": false,
+      "abstention_reason": null,
+      "max_score": 0.5668,
+      "source_match": true,
+      "page_match": true,
+      "term_match": true,
+      "top_results": [
+        {
+          "source_name": "BTS clinical statement on aspiration pneumonia",
+          "section": "Page 12 | Introduction | Part 1",
+          "pdf_page": 12,
+          "chunk_id": "c212093b-8d08-42e9-af46-ca2ed5d987d5_chk_0_2174a330",
+          "rerank_score": 0.5668
+        },
+        {
+          "source_name": "BTS clinical statement on aspiration pneumonia",
+          "section": "Page 2 | Introduction | Part 4",
+          "pdf_page": 2,
+          "chunk_id": "42e31513-95ed-4624-8811-61c245b79cbd_chk_3_067206b6",
+          "rerank_score": 0.5203
+        },
+        {
+          "source_name": "BTS clinical statement on aspiration pneumonia",
+          "section": "Page 2 | Introduction | Part 5",
+          "pdf_page": 2,
+          "chunk_id": "42e31513-95ed-4624-8811-61c245b79cbd_chk_4_594977f3",
+          "rerank_score": 0.4463
+        },
+        {
+          "source_name": "BTS clinical statement on aspiration pneumonia",
+          "section": "Page 14 | Introduction | Part 10",
+          "pdf_page": 14,
+          "chunk_id": "89f90d23-3768-4800-a0e5-73ae0649e766_chk_9_e170c44e",
+          "rerank_score": 0.4151
+        },
+        {
+          "source_name": "BTS clinical statement on aspiration pneumonia",
+          "section": "Page 13 | Introduction | Part 15",
+          "pdf_page": 13,
+          "chunk_id": "7380bd5a-5c38-4168-b110-a1954d1384bb_chk_14_ab002d86",
+          "rerank_score": 0.4134
+        }
+      ]
+    },
+    {
+      "id": "hap-definition-arabic",
+      "type": "arabic_against_english",
+      "passed": true,
+      "abstained": false,
+      "abstention_reason": null,
+      "max_score": 0.3607,
+      "source_match": true,
+      "page_match": true,
+      "term_match": true,
+      "top_results": [
+        {
+          "source_name": "Pneumonia: diagnosis and management (NG250)",
+          "section": "Page 41 | Part 4",
+          "pdf_page": 41,
+          "chunk_id": "cc7763bd-1a1d-4af9-bff3-56eaecda9002_chk_3_bb8eb7e7",
+          "rerank_score": 0.3607
+        },
+        {
+          "source_name": "Pneumonia: diagnosis and management (NG250)",
+          "section": "Page 41 | Part 1",
+          "pdf_page": 41,
+          "chunk_id": "cc7763bd-1a1d-4af9-bff3-56eaecda9002_chk_0_b4f23049",
+          "rerank_score": 0.2802
+        }
+      ]
+    },
+    {
+      "id": "pleural-case-style",
+      "type": "case_retrieval",
+      "passed": true,
+      "abstained": false,
+      "abstention_reason": null,
+      "max_score": 0.5319,
+      "source_match": true,
+      "page_match": true,
+      "term_match": true,
+      "top_results": [
+        {
+          "source_name": "British Thoracic Society Guideline for pleural disease",
+          "section": "Page 31 | 4 Hooper C, Lee YCG, Maskell N, et al. Investigation of a unilateral pleural effusion in | Part 1",
+          "pdf_page": 31,
+          "chunk_id": "7ae9de10-71e8-4d29-a147-655c62071346_chk_19_a49a51c5",
+          "rerank_score": 0.5319
+        },
+        {
+          "source_name": "British Thoracic Society Guideline for pleural disease",
+          "section": "Page 15 | Introduction | Part 2",
+          "pdf_page": 15,
+          "chunk_id": "f869014a-93a3-43dc-8e3a-d403b4c9f195_chk_1_8c0f08a7",
+          "rerank_score": 0.4693
+        },
+        {
+          "source_name": "British Thoracic Society Guideline for pleural disease",
+          "section": "Page 41 | Introduction | Part 5",
+          "pdf_page": 41,
+          "chunk_id": "7466a873-ba2f-4152-b72e-44957c8a6821_chk_4_ced62b52",
+          "rerank_score": 0.4682
+        },
+        {
+          "source_name": "British Thoracic Society Guideline for pleural disease",
+          "section": "Page 41 | Introduction | Part 8",
+          "pdf_page": 41,
+          "chunk_id": "7466a873-ba2f-4152-b72e-44957c8a6821_chk_7_e851f10e",
+          "rerank_score": 0.467
+        },
+        {
+          "source_name": "British Thoracic Society Guideline for pleural disease",
+          "section": "Page 41 | Introduction | Part 4",
+          "pdf_page": 41,
+          "chunk_id": "7466a873-ba2f-4152-b72e-44957c8a6821_chk_3_ecfd30eb",
+          "rerank_score": 0.4628
+        }
+      ]
+    },
+    {
+      "id": "out-of-scope-diabetes",
+      "type": "out_of_scope",
+      "passed": true,
+      "abstained": true,
+      "abstention_reason": "The question is outside the configured respiratory reference scope.",
+      "max_score": 0.0,
+      "source_match": true,
+      "page_match": true,
+      "term_match": true,
+      "top_results": []
+    },
+    {
+      "id": "unsupported-raw-image",
+      "type": "unsupported",
+      "passed": true,
+      "abstained": true,
+      "abstention_reason": "This service does not inspect raw chest images; provide structured imaging findings instead.",
+      "max_score": 0.0,
+      "source_match": true,
+      "page_match": true,
+      "term_match": true,
+      "top_results": []
+    },
+    {
+      "id": "prompt-injection",
+      "type": "prompt_injection",
+      "passed": true,
+      "abstained": true,
+      "abstention_reason": "The request attempts to override system instructions and was not used for retrieval.",
+      "max_score": 0.0,
+      "source_match": true,
+      "page_match": true,
+      "term_match": true,
+      "top_results": []
+    }
+  ],
+  "note": "Automated retrieval checks are not clinical validation."
+}

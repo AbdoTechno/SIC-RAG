@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from typing import Optional
-from api.dependencies import get_pipeline
+from api.dependencies import get_pipeline, get_retrieval_pipeline
 from api.schemas import ChunkingRequest, ChunkingResponse, ChunkListResponse
 from pipeline.ingestion_pipeline import IngestionPipeline
+from pipeline.retrieval_pipeline import RetrievalPipeline
 
 router = APIRouter(prefix="/documents", tags=["Chunks Inspector"])
 
@@ -11,7 +12,8 @@ router = APIRouter(prefix="/documents", tags=["Chunks Inspector"])
 def trigger_document_chunking(
     file_id: str,
     req: ChunkingRequest,
-    pipeline: IngestionPipeline = Depends(get_pipeline)
+    pipeline: IngestionPipeline = Depends(get_pipeline),
+    retrieval_pipeline: RetrievalPipeline = Depends(get_retrieval_pipeline),
 ):
     try:
         res = pipeline.run_chunking_for_file(
@@ -20,6 +22,8 @@ def trigger_document_chunking(
             chunker_override=req.chunker_override,
             normalizers_override=req.normalizers_override,
         )
+        if res["status"] == "newly_chunked":
+            retrieval_pipeline.invalidate_file_index(file_id)
         return {
             "file_id": res["file_id"],
             "status": res["status"],

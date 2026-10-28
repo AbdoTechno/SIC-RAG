@@ -47,6 +47,18 @@ python start.py
 The API is available at `http://127.0.0.1:8000`, interactive documentation at
 `/docs`, and health status at `/health`.
 
+### Ingest the reviewed Pulmora corpus
+
+Keep the source PDFs in `pdfs/` next to the audited `pdfs/sources.json`, then run:
+
+```bash
+python -m scripts.ingest_corpus --pdf-dir pdfs --manifest pdfs/sources.json --db data/pulmora_rag.db --report reports/ingestion_report.json
+```
+
+The command validates hashes and page counts, processes default-approved files in deterministic order, reuses unchanged documents/chunks/indexes, and exits nonzero if a required file fails. Optional layout-sensitive references are not indexed unless `--include-optional` is deliberately supplied. The generated report records each document's extraction, chunk, and index result.
+
+For a local persistent API using the same database, set `RAG_STORE_PROVIDER=sqlite_store` and `RAG_DB_DSN=data/pulmora_rag.db`. Authenticated `GET /knowledge/status` is the readiness source of truth. See `MOBILE_INTEGRATION.md` for the typed Flutter contract.
+
 The default deployment uses the lightweight deterministic hash embedder. To use
 the optional FastEmbed/ONNX provider on a machine with enough disk and memory,
 install the `embeddings` extra and update `pipeline_config.yaml`:
@@ -55,9 +67,7 @@ install the `embeddings` extra and update `pipeline_config.yaml`:
 pip install ".[embeddings]"
 ```
 
-Copy `.env.example` to `.env` only for local development. Never commit real
-credentials. The production database must be PostgreSQL with the `pgvector`
-extension enabled.
+Copy `.env.example` to `.env` only for local development. Never commit real credentials. For multi-instance production use PostgreSQL with the `pgvector` extension. SQLite is supported for a single process only when its database path is backed by hosting storage that survives restart and redeployment.
 
 ## Deploy to BotKeep
 
@@ -72,7 +82,7 @@ extension enabled.
 
 4. Add the following in BotKeep Environment/Secrets:
 
-   - `RAG_DB_DSN`: PostgreSQL connection URL for a database with `pgvector`.
+   - `RAG_DB_DSN`: PostgreSQL connection URL with `pgvector`, or a persistent absolute SQLite path when `RAG_STORE_PROVIDER=sqlite_store`.
    - `GROQ_API_KEY`: Groq secret key used for answer generation.
    - `RAG_API_KEY`: a long random shared key required in `X-API-Key`.
    - `RAG_CORS_ORIGINS`: comma-separated Flutter Web origins. It is not needed
@@ -89,10 +99,7 @@ extension enabled.
    GET https://YOUR_DOMAIN/docs
    ```
 
-BotKeep databases consume a separate workload slot. If the account has only one
-slot, use an external PostgreSQL provider that supports `pgvector`. Do not use
-the SQLite/in-memory testing mode for production: the vector index would not be
-durable across restarts.
+BotKeep databases consume a separate workload slot. If the account has only one slot, use an external PostgreSQL provider that supports `pgvector`, or a confirmed persistent volume for the single-process SQLite store. In-memory storage is test-only. A SQLite path inside an ephemeral container is not redeploy-safe.
 
 ## API contract
 

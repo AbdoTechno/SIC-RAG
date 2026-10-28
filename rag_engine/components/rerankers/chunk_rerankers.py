@@ -8,6 +8,8 @@ STOPWORDS: Set[str] = {
     "what", "is", "are", "how", "does", "do", "the", "a", "an", "in", "on", "of",
     "to", "for", "and", "or", "with", "by", "from", "about", "explain", "tell",
     "me", "work", "works", "working", "can", "you", "who", "where", "when", "why"
+    , "treatment", "treat", "relevant", "reference", "evidence", "clinical", "patient",
+    "assessment", "factor", "factors", "discuss", "discussion"
 }
 
 
