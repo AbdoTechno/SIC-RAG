@@ -47,6 +47,14 @@ python start.py
 The API is available at `http://127.0.0.1:8000`, interactive documentation at
 `/docs`, and health status at `/health`.
 
+The default deployment uses the lightweight deterministic hash embedder. To use
+the optional FastEmbed/ONNX provider on a machine with enough disk and memory,
+install the `embeddings` extra and update `pipeline_config.yaml`:
+
+```bash
+pip install ".[embeddings]"
+```
+
 Copy `.env.example` to `.env` only for local development. Never commit real
 credentials. The production database must be PostgreSQL with the `pgvector`
 extension enabled.
