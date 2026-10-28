@@ -24,7 +24,9 @@ def load_default_config() -> Dict[str, Any]:
     env_dsn = os.getenv("RAG_DB_DSN")
     if env_provider:
         cfg["document_store"]["provider"] = env_provider
-    if env_dsn:
+        if env_provider == "sqlite_store":
+            cfg["document_store"]["params"] = {"dsn": env_dsn or ":memory:"}
+    if env_dsn and env_provider != "sqlite_store":
         cfg["document_store"]["params"]["dsn"] = env_dsn
     return cfg
 

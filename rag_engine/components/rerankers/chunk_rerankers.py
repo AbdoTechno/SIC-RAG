@@ -1,7 +1,7 @@
 import re
 from typing import List, Set
 from core.interfaces import BaseReranker
-from core.schemas import ScoredChunk
+from core.schemas import DocumentChunk
 from core.registry import registry
 
 STOPWORDS: Set[str] = {
@@ -28,15 +28,15 @@ class HybridOverlapReranker(BaseReranker):
         self.semantic_weight = semantic_weight
         self.lexical_weight = lexical_weight
 
-    def rerank(self, query: str, candidates: List[ScoredChunk], top_k: int = 5) -> List[ScoredChunk]:
-        if not candidates:
+    def rerank(self, query: str, chunks: List[DocumentChunk], top_k: int = 5) -> List[DocumentChunk]:
+        if not chunks:
             return []
 
         q_stems = _extract_meaningful_stems(query)
         if not q_stems:
             q_stems = set(re.findall(r"[a-zA-Z0-9_\u0600-\u06FF]{2,}", query.lower()))
 
-        for cand in candidates:
+        for cand in chunks:
             c_stems = _extract_meaningful_stems(cand.text)
             sec_stems = _extract_meaningful_stems(cand.metadata.page_or_section or "")
 
@@ -53,5 +53,5 @@ class HybridOverlapReranker(BaseReranker):
             )
             cand.rerank_score = round(min(1.0, final_score), 4)
 
-        ranked = sorted(candidates, key=lambda x: x.rerank_score, reverse=True)
+        ranked = sorted(chunks, key=lambda x: x.rerank_score, reverse=True)
         return ranked[:top_k]

@@ -89,10 +89,14 @@ def test_end_to_end_raw_blob_to_parsed_docs_contract():
         )
 
         # Clear existing parsed documents for this file to ensure exactly 1 record is asserted
-        with store._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM parsed_documents WHERE file_id = %s;", (file_id,))
-            conn.commit()
+        if hasattr(store, "_get_connection"):
+            with store._get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM parsed_documents WHERE file_id = %s;", (file_id,))
+                conn.commit()
+        else:
+            store.conn.execute("DELETE FROM parsed_documents WHERE file_id = ?;", (file_id,))
+            store.conn.commit()
 
         store.save_parsed_documents(parsed_docs)
         saved_docs = store.get_parsed_docs_by_file(file_id) if hasattr(store, "get_parsed_docs_by_file") else store.get_parsed_documents_by_file(file_id)
