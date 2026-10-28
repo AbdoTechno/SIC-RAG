@@ -34,11 +34,20 @@ def _has_ready_knowledge(database_path: Path) -> bool:
 def _seed_parts(seed_path: Path) -> List[Path]:
     if seed_path.is_file():
         return [seed_path]
-    return sorted(seed_path.parent.glob(f"{seed_path.name}.part-*"))
+    parts = sorted(seed_path.parent.glob(f"{seed_path.name}.part-*"))
+    if parts:
+        return parts
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    fallback = repo_root / "seed" / seed_path.name
+    if fallback.is_file():
+        return [fallback]
+    return sorted(fallback.parent.glob(f"{fallback.name}.part-*"))
 
 
 def _copy_and_verify_seed(parts: List[Path], seed_path: Path, destination: Path) -> None:
     checksum_path = Path(f"{seed_path}.sha256")
+    if not checksum_path.is_file() and parts:
+        checksum_path = parts[0].parent / f"{seed_path.name}.sha256"
     if not checksum_path.is_file():
         raise RuntimeError("Bundled knowledge seed checksum is missing.")
     expected = checksum_path.read_text(encoding="utf-8").strip().split()[0].lower()
@@ -63,11 +72,14 @@ def bootstrap_sqlite_seed(
     if not _enabled(os.getenv("RAG_BOOTSTRAP_SEED")):
         return False
 
-    resolved_dsn = target_dsn or os.getenv("RAG_DB_DSN", "")
+    resolved_dsn = target_dsn or os.getenv("RAG_DB_DSN") or "data/pulmora_rag.db"
     if not resolved_dsn or resolved_dsn == ":memory:" or resolved_dsn.startswith("file:"):
         return False
 
+    repo_root = Path(__file__).resolve().parent.parent.parent
     target_path = Path(resolved_dsn).expanduser()
+    if not target_path.is_absolute() and not target_path.parent.is_dir() and (repo_root / target_path.parent).is_dir():
+        target_path = repo_root / target_path
     if _has_ready_knowledge(target_path):
         return False
 

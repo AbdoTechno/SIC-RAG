@@ -15,7 +15,7 @@ def load_default_config() -> Dict[str, Any]:
     if env_provider:
         cfg["document_store"]["provider"] = env_provider
         if env_provider == "sqlite_store":
-            sqlite_dsn = env_dsn or ":memory:"
+            sqlite_dsn = env_dsn or "data/pulmora_rag.db"
             cfg["document_store"]["params"] = {"dsn": sqlite_dsn}
             cfg.setdefault("retrieval", {})["vector_store"] = {
                 "provider": "sqlite_vector_store",

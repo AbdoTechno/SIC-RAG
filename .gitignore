@@ -20,3 +20,5 @@ tmp/
 # Reference binaries stay local because redistribution rights are not asserted.
 # Keep the audited manifest and notes in Git.
 pdfs/*.pdf
+
+*.ipynb

@@ -50,6 +50,13 @@ def create_app(
         lifespan=lifespan,
     )
 
+    try:
+        from core.seed_bootstrap import bootstrap_sqlite_seed
+        bootstrap_sqlite_seed()
+    except Exception as exc:
+        import logging
+        logging.getLogger("rag_engine").warning(f"Seed bootstrap skipped or failed: {exc}")
+
     cfg = load_default_config()
     active_ingest = pipeline or IngestionPipeline(cfg)
     active_retrieval = retrieval_pipeline or RetrievalPipeline(
